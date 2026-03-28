@@ -566,15 +566,11 @@ class ProblemEncoder:
             sum_out = sum(a for _, a in out_contribs)
             sum_in  = sum(a for _, a in in_contribs)
 
-            # Residual when no routes are selected (all Z_i = +1):
-            # R = sum_out - sum_in - I_n/2  (positive = outflow > inflow+inventory)
-            # When a route IS selected (Z_i → -1), its contribution flips sign.
-            # For outgoing: contribution reduces by 2*a_i (less excess)
-            # For incoming: contribution increases by 2*a_j (more supply)
-
-            # Only penalise if there's a potential flow violation
-            # (max outflow > max inflow + inventory)
-            if sum_out <= sum_in + I_n / 2.0:
+            # Only skip if max outflow ≤ inventory alone (no inflow needed).
+            # DO NOT include sum_in here — inflow is not guaranteed until
+            # upstream routes are selected, which is exactly what this
+            # penalty is designed to enforce.
+            if sum_out <= I_n / 2.0:
                 continue
 
             R = sum_out - sum_in - I_n / 2.0
