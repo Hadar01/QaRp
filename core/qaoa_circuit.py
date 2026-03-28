@@ -47,12 +47,22 @@ from scipy.optimize import minimize
 
 from core.problem_encoder import IsingHamiltonian
 
-# Qulacs import — graceful fallback for environments without Qulacs
+# Qulacs import — graceful fallback chain:
+#   1. Try real qulacs (fastest, C++ backend)
+#   2. Fall back to pure-numpy simulator (works everywhere, no C extensions)
 try:
     from qulacs import QuantumState, QuantumCircuit, Observable
+    # Smoke-test: catch segfault-prone broken builds (e.g. aarch64 qulacs 0.6.1)
+    _test_state = QuantumState(2)
+    _test_state.set_zero_state()
+    del _test_state
     QULACS_AVAILABLE = True
-except ImportError:                             # pragma: no cover
-    QULACS_AVAILABLE = False
+except (ImportError, Exception):
+    try:
+        from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
+        QULACS_AVAILABLE = True  # numpy simulator provides the same API
+    except ImportError:
+        QULACS_AVAILABLE = False
 
 
 class QAOACircuit:

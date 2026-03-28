@@ -105,13 +105,19 @@ except ImportError:
 # ── Qulacs fallback (available in local dev env; mpiQulacs on FX700) ─────────
 try:
     from qulacs import QuantumState, QuantumCircuit, Observable
+    # Smoke-test for broken builds (aarch64 qulacs 0.6.1 segfaults)
+    _ts = QuantumState(2); _ts.set_zero_state(); del _ts
     QULACS_AVAILABLE = True
-except ImportError:
-    QULACS_AVAILABLE = False
-    logging.warning(
-        "qulacs not found. LOCAL_SIM mode will be unavailable. "
-        "Install qulacs for local development, or use mpiQulacs on FX700."
-    )
+except (ImportError, Exception):
+    try:
+        from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
+        QULACS_AVAILABLE = True
+        logging.info("Using pure-numpy quantum simulator (qulacs unavailable)")
+    except ImportError:
+        QULACS_AVAILABLE = False
+        logging.warning(
+            "qulacs and numpy_simulator both unavailable. LOCAL_SIM mode disabled."
+        )
 
 from core.problem_encoder import IsingHamiltonian
 
