@@ -578,15 +578,21 @@ class ProblemEncoder:
             # Constant: lam * R^2
             offset += lam * R ** 2
 
-            # Linear terms for outgoing routes: +lam * 2 * R * a_i * Z_i
-            # (selecting outgoing route = Z_i→-1 reduces penalty)
+            # Linear terms derived from P = λ·(C - Σ_out a_i Z_i + Σ_in a_j Z_j)²
+            # where C = sum_out - sum_in - I_n/2.
+            #
+            # ∂P/∂Z_i (outgoing) → coefficient -2λ·C·a_i
+            # ∂P/∂Z_j (incoming) → coefficient +2λ·C·a_j
+            #
+            # When C < 0 (typical: max inflow > max outflow - inventory):
+            #   outgoing h[i] -= negative → h increases → Z=-1 (select) costs more
+            #   incoming h[j] += negative → h decreases → Z=-1 (select) costs less
+            # This correctly penalizes outgoing without incoming.
             for qi, a_i in out_contribs:
-                h[qi] = h.get(qi, 0.0) + lam * 2.0 * R * a_i
+                h[qi] = h.get(qi, 0.0) - lam * 2.0 * R * a_i
 
-            # Linear terms for incoming routes: -lam * 2 * R * a_j * Z_j
-            # (selecting incoming route = Z_j→-1 INCREASES supply, reducing penalty)
             for qj, a_j in in_contribs:
-                h[qj] = h.get(qj, 0.0) - lam * 2.0 * R * a_j
+                h[qj] = h.get(qj, 0.0) + lam * 2.0 * R * a_j
 
             # ZZ terms between outgoing pairs
             for p in range(len(out_contribs)):
