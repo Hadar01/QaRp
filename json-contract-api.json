@@ -1,0 +1,429 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Quantum Supply Chain Optimization API",
+    "description": "Quantum-accelerated supply chain optimization using Qulacs",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/optimize": {
+      "post": {
+        "summary": "Optimize Supply Chain",
+        "description": "Main optimization endpoint for supply chain",
+        "operationId": "optimize_supply_chain_api_v1_optimize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/optimize/batch": {
+      "post": {
+        "summary": "Batch Optimize",
+        "description": "Batch optimization for multiple scenarios",
+        "operationId": "batch_optimize_api_v1_optimize_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/OptimizationRequest"
+                },
+                "type": "array",
+                "title": "Requests"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "summary": "Get Capabilities",
+        "description": "Return quantum optimizer capabilities",
+        "operationId": "get_capabilities_api_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DemandForecast": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "demand": {
+            "type": "number",
+            "title": "Demand"
+          },
+          "priority": {
+            "type": "integer",
+            "maximum": 5,
+            "minimum": 1,
+            "title": "Priority",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "demand"
+        ],
+        "title": "DemandForecast"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "OptimizationObjective": {
+        "type": "string",
+        "enum": [
+          "minimize_cost",
+          "minimize_time",
+          "maximize_efficiency",
+          "balanced"
+        ],
+        "title": "OptimizationObjective"
+      },
+      "OptimizationRequest": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/SupplyNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/Route"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "demands": {
+            "items": {
+              "$ref": "#/components/schemas/DemandForecast"
+            },
+            "type": "array",
+            "title": "Demands"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/OptimizationObjective",
+            "default": "balanced"
+          },
+          "quantum_iterations": {
+            "type": "integer",
+            "maximum": 1000,
+            "minimum": 10,
+            "title": "Quantum Iterations",
+            "default": 100
+          },
+          "constraints": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constraints"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodes",
+          "routes",
+          "demands"
+        ],
+        "title": "OptimizationRequest"
+      },
+      "OptimizationResult": {
+        "properties": {
+          "optimization_id": {
+            "type": "string",
+            "title": "Optimization Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "objective_value": {
+            "type": "number",
+            "title": "Objective Value"
+          },
+          "allocations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Allocations"
+          },
+          "route_assignments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Route Assignments"
+          },
+          "quantum_metrics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Quantum Metrics"
+          },
+          "classical_comparison": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classical Comparison"
+          }
+        },
+        "type": "object",
+        "required": [
+          "optimization_id",
+          "status",
+          "timestamp",
+          "objective_value",
+          "allocations",
+          "route_assignments",
+          "quantum_metrics"
+        ],
+        "title": "OptimizationResult"
+      },
+      "Route": {
+        "properties": {
+          "from_node": {
+            "type": "string",
+            "title": "From Node"
+          },
+          "to_node": {
+            "type": "string",
+            "title": "To Node"
+          },
+          "distance": {
+            "type": "number",
+            "title": "Distance"
+          },
+          "cost_per_unit": {
+            "type": "number",
+            "title": "Cost Per Unit"
+          },
+          "time_hours": {
+            "type": "number",
+            "title": "Time Hours"
+          },
+          "capacity": {
+            "type": "number",
+            "title": "Capacity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_node",
+          "to_node",
+          "distance",
+          "cost_per_unit",
+          "time_hours",
+          "capacity"
+        ],
+        "title": "Route"
+      },
+      "SupplyNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "warehouse, distribution_center, retail, supplier"
+          },
+          "capacity": {
+            "type": "number",
+            "title": "Capacity"
+          },
+          "current_inventory": {
+            "type": "number",
+            "title": "Current Inventory"
+          },
+          "coordinates": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "capacity",
+          "current_inventory"
+        ],
+        "title": "SupplyNode"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

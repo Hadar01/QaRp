@@ -173,6 +173,14 @@ class NoisyCircuitEvaluator:
         if noise_level < 1e-10:
             return self.qaoa.expectation_value(self.params)
 
+        import platform
+        _arch = platform.machine().lower()
+        if _arch in ('aarch64', 'arm64'):
+            # Skip qulacs entirely on aarch64 — use statistical noise model
+            ideal = self.qaoa.expectation_value(self.params)
+            depol_factor = (1 - noise_level) ** (self.n * self.qaoa.p * 3)
+            return float(ideal * depol_factor + self.H.offset * (1 - depol_factor))
+
         try:
             from qulacs import QuantumState, QuantumCircuit, Observable
             from qulacs.gate import DepolarizingNoise

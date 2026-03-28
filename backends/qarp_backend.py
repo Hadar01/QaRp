@@ -29,6 +29,7 @@ KEY CHANGES from v1.6.2 to v0.4.3:
 import os
 import time
 import logging
+import platform
 from typing import Optional
 from enum import Enum
 from dataclasses import dataclass
@@ -103,21 +104,28 @@ except ImportError:
     QISKIT_AVAILABLE = False
 
 # ── Qulacs fallback (available in local dev env; mpiQulacs on FX700) ─────────
-try:
-    from qulacs import QuantumState, QuantumCircuit, Observable
-    # Smoke-test for broken builds (aarch64 qulacs 0.6.1 segfaults)
-    _ts = QuantumState(2); _ts.set_zero_state(); del _ts
-    QULACS_AVAILABLE = True
-except (ImportError, Exception):
+# On aarch64 (FX700 compute nodes): skip qulacs entirely — binary segfaults
+_ARCH = platform.machine().lower()
+if _ARCH in ('aarch64', 'arm64'):
     try:
         from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
         QULACS_AVAILABLE = True
-        logging.info("Using pure-numpy quantum simulator (qulacs unavailable)")
+        logging.info("aarch64 detected — using pure-numpy quantum simulator")
     except ImportError:
         QULACS_AVAILABLE = False
-        logging.warning(
-            "qulacs and numpy_simulator both unavailable. LOCAL_SIM mode disabled."
-        )
+        logging.warning("numpy_simulator unavailable on aarch64. LOCAL_SIM disabled.")
+else:
+    try:
+        from qulacs import QuantumState, QuantumCircuit, Observable
+        QULACS_AVAILABLE = True
+    except ImportError:
+        try:
+            from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
+            QULACS_AVAILABLE = True
+            logging.info("Using pure-numpy quantum simulator (qulacs unavailable)")
+        except ImportError:
+            QULACS_AVAILABLE = False
+            logging.warning("qulacs and numpy_simulator both unavailable.")
 
 from core.problem_encoder import IsingHamiltonian
 

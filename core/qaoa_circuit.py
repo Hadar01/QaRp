@@ -41,6 +41,7 @@ This binary decision produces the following derived quantities:
 
 from __future__ import annotations
 
+import platform
 import numpy as np
 from collections import Counter
 from scipy.optimize import minimize
@@ -48,21 +49,27 @@ from scipy.optimize import minimize
 from core.problem_encoder import IsingHamiltonian
 
 # Qulacs import — graceful fallback chain:
-#   1. Try real qulacs (fastest, C++ backend)
-#   2. Fall back to pure-numpy simulator (works everywhere, no C extensions)
-try:
-    from qulacs import QuantumState, QuantumCircuit, Observable
-    # Smoke-test: catch segfault-prone broken builds (e.g. aarch64 qulacs 0.6.1)
-    _test_state = QuantumState(2)
-    _test_state.set_zero_state()
-    del _test_state
-    QULACS_AVAILABLE = True
-except (ImportError, Exception):
+#   1. On aarch64 (FX700 compute): skip qulacs entirely (binary segfaults)
+#   2. On x86_64: try real qulacs (fastest, C++ backend)
+#   3. Fallback: pure-numpy simulator (works everywhere, no C extensions)
+_ARCH = platform.machine().lower()
+if _ARCH in ('aarch64', 'arm64'):
+    # FX700 compute nodes: qulacs 0.6.1 aarch64 binary segfaults on QuantumState
     try:
         from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
-        QULACS_AVAILABLE = True  # numpy simulator provides the same API
+        QULACS_AVAILABLE = True
     except ImportError:
         QULACS_AVAILABLE = False
+else:
+    try:
+        from qulacs import QuantumState, QuantumCircuit, Observable
+        QULACS_AVAILABLE = True
+    except ImportError:
+        try:
+            from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
+            QULACS_AVAILABLE = True
+        except ImportError:
+            QULACS_AVAILABLE = False
 
 
 class QAOACircuit:

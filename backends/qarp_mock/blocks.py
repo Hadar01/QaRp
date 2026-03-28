@@ -50,7 +50,7 @@ class Block:
 
     def to_qulacs(self, noise_model=None):
         """Convert to Qulacs QuantumCircuit."""
-        from qulacs import QuantumCircuit
+        from backends.qarp_mock.qulacs_compat import QuantumCircuit
         return QuantumCircuit(self.n_qubits)
 
     def dagger(self):
@@ -101,7 +101,7 @@ class CompositeBlock(Block):
     get_parameter_names = get_symbols
 
     def to_qulacs(self, noise_model=None):
-        from qulacs import QuantumCircuit
+        from backends.qarp_mock.qulacs_compat import QuantumCircuit
         circuit = QuantumCircuit(self.n_qubits)
         for b in self.blocks:
             sub = b.to_qulacs(noise_model)
@@ -121,7 +121,7 @@ class HnBlock(Block):
         super().__init__(n_qubits, "Hn")
 
     def to_qulacs(self, noise_model=None):
-        from qulacs import QuantumCircuit
+        from backends.qarp_mock.qulacs_compat import QuantumCircuit
         circuit = QuantumCircuit(self.n_qubits)
         for i in range(self.n_qubits):
             circuit.add_H_gate(i)
@@ -147,7 +147,7 @@ class IsingCostBlock(Block):
         self._symbols[gamma_symbol] = 0.0
 
     def to_qulacs(self, noise_model=None):
-        from qulacs import QuantumCircuit
+        from backends.qarp_mock.qulacs_compat import QuantumCircuit
         circuit = QuantumCircuit(self.n_qubits)
         gamma = self._symbols.get(self.gamma_symbol, 0.0)
 
@@ -173,7 +173,7 @@ class MixerBlock(Block):
         self._symbols[beta_symbol] = 0.0
 
     def to_qulacs(self, noise_model=None):
-        from qulacs import QuantumCircuit
+        from backends.qarp_mock.qulacs_compat import QuantumCircuit
         circuit = QuantumCircuit(self.n_qubits)
         beta = self._symbols.get(self.beta_symbol, 0.0)
         for i in range(self.n_qubits):
@@ -199,7 +199,7 @@ class LayeredHEABlock(Block):
                     self._symbols[name] = 0.0
 
     def to_qulacs(self, noise_model=None):
-        from qulacs import QuantumCircuit
+        from backends.qarp_mock.qulacs_compat import QuantumCircuit
         circuit = QuantumCircuit(self.n_qubits)
         for layer in range(self.depth):
             for q in range(self.n_qubits):

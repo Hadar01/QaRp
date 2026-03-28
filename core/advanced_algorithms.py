@@ -33,7 +33,7 @@ from core.problem_encoder import (
 logger = logging.getLogger(__name__)
 
 try:
-    from qulacs import QuantumState, QuantumCircuit as QulacsCircuit, Observable
+    from backends.qarp_mock.qulacs_compat import QuantumState, QuantumCircuit as QulacsCircuit, Observable
     QULACS_AVAILABLE = True
 except ImportError:
     QULACS_AVAILABLE = False

@@ -49,7 +49,7 @@ class StateVector:
 
     def evaluate(self, parameters: dict) -> float:
         """Evaluate ⟨ψ(params)|H|ψ(params)⟩ using Qulacs state vector."""
-        from qulacs import QuantumState, Observable
+        from backends.qarp_mock.qulacs_compat import QuantumState, Observable
 
         block = self.ket or self.bra
         if block is None:
@@ -79,7 +79,7 @@ class StateVector:
     def _build_fragment_observable(self, n_frag: int,
                                    reverse_map: dict):
         """Build Qulacs Observable with remapped qubit indices for fragment."""
-        from qulacs import Observable
+        from backends.qarp_mock.qulacs_compat import Observable
         obs = Observable(n_frag)
         for term, coeff in self.operator.terms.items():
             if not term:
@@ -132,7 +132,7 @@ class Sampler:
         self.n_shots = n_shots or 1000
 
     def evaluate(self, parameters: dict) -> Dict[tuple, float]:
-        from qulacs import QuantumState
+        from backends.qarp_mock.qulacs_compat import QuantumState
 
         block = self.ket
         if block is None:

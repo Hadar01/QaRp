@@ -75,7 +75,7 @@ class ParametricCircuit:
 
     def to_qulacs_circuit(self):
         """Build a concrete Qulacs QuantumCircuit with current parameter values."""
-        from qulacs import QuantumCircuit
+        from backends.qarp_mock.qulacs_compat import QuantumCircuit
         circuit = QuantumCircuit(self.n_qubits)
         for gate in self._gates:
             gtype = gate[0]

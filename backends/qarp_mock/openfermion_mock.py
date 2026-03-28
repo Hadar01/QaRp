@@ -108,7 +108,7 @@ class QubitOperator:
 
     def to_qulacs_observable(self, n_qubits: int):
         """Convert non-identity terms to a Qulacs Observable."""
-        from qulacs import Observable
+        from backends.qarp_mock.qulacs_compat import Observable
         obs = Observable(n_qubits)
         for term, coeff in self.terms.items():
             if abs(coeff) < 1e-15 or not term:

@@ -71,7 +71,7 @@ class QulacsEngine:
         dict mapping bitstring tuples to probability estimates.
         Example: {(0, 1, 0): 0.45, (1, 0, 1): 0.55}
         """
-        from qulacs import QuantumState
+        from backends.qarp_mock.qulacs_compat import QuantumState
 
         qulacs_circuit = circuit.to_qulacs()
         n = circuit.n_qubits
@@ -128,7 +128,7 @@ class TketEngine:
         return results[0] if len(results) == 1 else results
 
     def sample(self, circuit, n_shots: int, device=None) -> Dict[tuple, float]:
-        from qulacs import QuantumState
+        from backends.qarp_mock.qulacs_compat import QuantumState
 
         qulacs_circuit = circuit.to_qulacs()
         n = circuit.n_qubits

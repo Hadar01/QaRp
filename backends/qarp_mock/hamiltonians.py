@@ -44,7 +44,7 @@ class PauliHamiltonian:
 
     def to_qulacs_observable(self):
         """Convert to a Qulacs Observable for state-vector simulation."""
-        from qulacs import Observable
+        from backends.qarp_mock.qulacs_compat import Observable
         obs = Observable(self.n_qubits)
         for term in self.terms:
             # Qulacs format: "Z 0 Z 1" for a ZZ term on qubits 0 and 1
