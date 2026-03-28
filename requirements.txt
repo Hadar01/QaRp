@@ -1,0 +1,15 @@
+# Quantum Supply Chain Optimization — QSC2025
+# Core dependencies
+qulacs>=0.6.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# API server
+fastapi>=0.100.0
+uvicorn>=0.20.0
+pydantic>=2.0.0
+
+# Optional: IBM Quantum hardware backend
+# qiskit>=1.0.0
+# qiskit-aer>=0.13.0
+# qiskit-ibm-runtime>=0.20.0

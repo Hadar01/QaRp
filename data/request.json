@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    {"id":"WH-1","name":"Warehouse","type":"warehouse","capacity":1000,"current_inventory":800},
+    {"id":"STORE-1","name":"Store 1","type":"retail","capacity":300,"current_inventory":50},
+    {"id":"STORE-2","name":"Store 2","type":"retail","capacity":300,"current_inventory":30}
+  ],
+  "routes": [
+    {"from_node":"WH-1","to_node":"STORE-1","distance":100,"cost_per_unit":2.5,"time_hours":1.5,"capacity":300},
+    {"from_node":"WH-1","to_node":"STORE-2","distance":150,"cost_per_unit":3.0,"time_hours":2.0,"capacity":300}
+  ],
+  "demands": [
+    {"node_id":"STORE-1","demand":200,"priority":3},
+    {"node_id":"STORE-2","demand":150,"priority":2}
+  ],
+  "objective":"balanced",
+  "quantum_iterations":100,
+  "constraints":{"lambda_time":0.5}
+}

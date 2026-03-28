@@ -1,0 +1,93 @@
+{
+  "_description": "36-qubit continental supply chain: 6 mega-warehouses, 8 regional DCs, 10 retail hubs, 36 shipping routes",
+  "nodes": [
+    {"id":"WH-SEA",  "name":"Seattle Mega-Warehouse",       "type":"warehouse",           "capacity":8000,  "current_inventory":6800},
+    {"id":"WH-SFO",  "name":"San Francisco Warehouse",      "type":"warehouse",           "capacity":7000,  "current_inventory":5900},
+    {"id":"WH-DFW",  "name":"Dallas Super-Warehouse",       "type":"warehouse",           "capacity":9000,  "current_inventory":7600},
+    {"id":"WH-ORD",  "name":"Chicago Mega-Warehouse",       "type":"warehouse",           "capacity":8500,  "current_inventory":7200},
+    {"id":"WH-ATL",  "name":"Atlanta Distribution Hub",     "type":"warehouse",           "capacity":7500,  "current_inventory":6300},
+    {"id":"WH-JFK",  "name":"New York Mega-Warehouse",      "type":"warehouse",           "capacity":10000, "current_inventory":8500},
+
+    {"id":"DC-PNW",  "name":"Pacific Northwest DC",         "type":"distribution_center", "capacity":3000,  "current_inventory":450},
+    {"id":"DC-CAL",  "name":"California DC",                "type":"distribution_center", "capacity":3500,  "current_inventory":500},
+    {"id":"DC-MTN",  "name":"Mountain Region DC",           "type":"distribution_center", "capacity":2500,  "current_inventory":300},
+    {"id":"DC-SCE",  "name":"South Central DC",             "type":"distribution_center", "capacity":3000,  "current_inventory":400},
+    {"id":"DC-GLK",  "name":"Great Lakes DC",               "type":"distribution_center", "capacity":3000,  "current_inventory":350},
+    {"id":"DC-MDA",  "name":"Mid-Atlantic DC",              "type":"distribution_center", "capacity":3500,  "current_inventory":500},
+    {"id":"DC-SEA",  "name":"Southeast DC",                 "type":"distribution_center", "capacity":2800,  "current_inventory":380},
+    {"id":"DC-NEN",  "name":"New England DC",               "type":"distribution_center", "capacity":2500,  "current_inventory":320},
+
+    {"id":"RET-PDX",  "name":"Portland Retail",             "type":"retail",              "capacity":1200,  "current_inventory":80},
+    {"id":"RET-LAX",  "name":"Los Angeles Retail",          "type":"retail",              "capacity":2000,  "current_inventory":150},
+    {"id":"RET-DEN",  "name":"Denver Retail",               "type":"retail",              "capacity":1000,  "current_inventory":60},
+    {"id":"RET-HOU",  "name":"Houston Retail",              "type":"retail",              "capacity":1500,  "current_inventory":100},
+    {"id":"RET-DTW",  "name":"Detroit Retail",              "type":"retail",              "capacity":1100,  "current_inventory":70},
+    {"id":"RET-MIA",  "name":"Miami Retail",                "type":"retail",              "capacity":1400,  "current_inventory":90},
+    {"id":"RET-PHI",  "name":"Philadelphia Retail",         "type":"retail",              "capacity":1300,  "current_inventory":85},
+    {"id":"RET-BOS",  "name":"Boston Retail",               "type":"retail",              "capacity":1000,  "current_inventory":65},
+    {"id":"RET-CHI",  "name":"Chicago Retail",              "type":"retail",              "capacity":1600,  "current_inventory":110},
+    {"id":"RET-NYC",  "name":"New York City Retail",        "type":"retail",              "capacity":2200,  "current_inventory":160}
+  ],
+
+  "routes": [
+    {"from_node":"WH-SEA",  "to_node":"DC-PNW",  "distance":180,  "cost_per_unit":1.2, "time_hours":2.5,  "capacity":2000},
+    {"from_node":"WH-SEA",  "to_node":"DC-CAL",  "distance":810,  "cost_per_unit":2.8, "time_hours":10.0, "capacity":1500},
+    {"from_node":"WH-SEA",  "to_node":"DC-MTN",  "distance":550,  "cost_per_unit":2.2, "time_hours":7.0,  "capacity":1200},
+    {"from_node":"WH-SFO",  "to_node":"DC-CAL",  "distance":60,   "cost_per_unit":0.8, "time_hours":1.0,  "capacity":2500},
+    {"from_node":"WH-SFO",  "to_node":"DC-MTN",  "distance":740,  "cost_per_unit":2.5, "time_hours":9.0,  "capacity":1000},
+    {"from_node":"WH-SFO",  "to_node":"DC-PNW",  "distance":640,  "cost_per_unit":2.3, "time_hours":8.0,  "capacity":800},
+    {"from_node":"WH-DFW",  "to_node":"DC-SCE",  "distance":150,  "cost_per_unit":1.0, "time_hours":2.0,  "capacity":2200},
+    {"from_node":"WH-DFW",  "to_node":"DC-MTN",  "distance":620,  "cost_per_unit":2.4, "time_hours":8.0,  "capacity":1100},
+    {"from_node":"WH-DFW",  "to_node":"DC-SEA",  "distance":780,  "cost_per_unit":2.9, "time_hours":10.0, "capacity":900},
+    {"from_node":"WH-ORD",  "to_node":"DC-GLK",  "distance":100,  "cost_per_unit":0.9, "time_hours":1.5,  "capacity":2400},
+    {"from_node":"WH-ORD",  "to_node":"DC-MDA",  "distance":590,  "cost_per_unit":2.1, "time_hours":7.5,  "capacity":1300},
+    {"from_node":"WH-ORD",  "to_node":"DC-MTN",  "distance":900,  "cost_per_unit":3.0, "time_hours":11.0, "capacity":700},
+    {"from_node":"WH-ATL",  "to_node":"DC-SEA",  "distance":160,  "cost_per_unit":1.1, "time_hours":2.0,  "capacity":2100},
+    {"from_node":"WH-ATL",  "to_node":"DC-SCE",  "distance":680,  "cost_per_unit":2.6, "time_hours":8.5,  "capacity":1000},
+    {"from_node":"WH-ATL",  "to_node":"DC-MDA",  "distance":550,  "cost_per_unit":2.0, "time_hours":7.0,  "capacity":1200},
+    {"from_node":"WH-JFK",  "to_node":"DC-MDA",  "distance":90,   "cost_per_unit":0.7, "time_hours":1.2,  "capacity":2800},
+    {"from_node":"WH-JFK",  "to_node":"DC-NEN",  "distance":200,  "cost_per_unit":1.3, "time_hours":3.0,  "capacity":1800},
+    {"from_node":"WH-JFK",  "to_node":"DC-GLK",  "distance":640,  "cost_per_unit":2.3, "time_hours":8.0,  "capacity":900},
+
+    {"from_node":"DC-PNW",  "to_node":"RET-PDX",  "distance":75,  "cost_per_unit":0.9, "time_hours":1.0,  "capacity":1000},
+    {"from_node":"DC-CAL",  "to_node":"RET-LAX",  "distance":350,  "cost_per_unit":1.5, "time_hours":4.5,  "capacity":1400},
+    {"from_node":"DC-CAL",  "to_node":"RET-DEN",  "distance":850,  "cost_per_unit":2.8, "time_hours":11.0, "capacity":600},
+    {"from_node":"DC-MTN",  "to_node":"RET-DEN",  "distance":180,  "cost_per_unit":1.2, "time_hours":2.5,  "capacity":900},
+    {"from_node":"DC-SCE",  "to_node":"RET-HOU",  "distance":240,  "cost_per_unit":1.4, "time_hours":3.5,  "capacity":1100},
+    {"from_node":"DC-SCE",  "to_node":"RET-DEN",  "distance":660,  "cost_per_unit":2.4, "time_hours":8.5,  "capacity":500},
+    {"from_node":"DC-GLK",  "to_node":"RET-DTW",  "distance":230,  "cost_per_unit":1.3, "time_hours":3.0,  "capacity":900},
+    {"from_node":"DC-GLK",  "to_node":"RET-CHI",  "distance":90,   "cost_per_unit":0.8, "time_hours":1.2,  "capacity":1300},
+    {"from_node":"DC-MDA",  "to_node":"RET-PHI",  "distance":100,  "cost_per_unit":0.9, "time_hours":1.5,  "capacity":1100},
+    {"from_node":"DC-MDA",  "to_node":"RET-NYC",  "distance":85,   "cost_per_unit":0.8, "time_hours":1.2,  "capacity":1800},
+    {"from_node":"DC-SEA",  "to_node":"RET-MIA",  "distance":150,  "cost_per_unit":1.1, "time_hours":2.0,  "capacity":1200},
+    {"from_node":"DC-SEA",  "to_node":"RET-HOU",  "distance":790,  "cost_per_unit":3.0, "time_hours":10.0, "capacity":600},
+    {"from_node":"DC-NEN",  "to_node":"RET-BOS",  "distance":65,   "cost_per_unit":0.8, "time_hours":1.0,  "capacity":800},
+    {"from_node":"DC-NEN",  "to_node":"RET-NYC",  "distance":180,  "cost_per_unit":1.2, "time_hours":2.5,  "capacity":700},
+    {"from_node":"DC-NEN",  "to_node":"RET-PHI",  "distance":250,  "cost_per_unit":1.5, "time_hours":3.5,  "capacity":500},
+
+    {"from_node":"WH-DFW",  "to_node":"DC-GLK",  "distance":800,  "cost_per_unit":3.0, "time_hours":10.0, "capacity":700},
+    {"from_node":"WH-ATL",  "to_node":"DC-NEN",  "distance":880,  "cost_per_unit":3.2, "time_hours":11.0, "capacity":600},
+    {"from_node":"WH-ORD",  "to_node":"DC-SCE",  "distance":700,  "cost_per_unit":2.7, "time_hours":9.0,  "capacity":800}
+  ],
+
+  "demands": [
+    {"node_id":"RET-PDX",  "demand":800,   "priority":3},
+    {"node_id":"RET-LAX",  "demand":1500,  "priority":5},
+    {"node_id":"RET-DEN",  "demand":700,   "priority":3},
+    {"node_id":"RET-HOU",  "demand":1100,  "priority":4},
+    {"node_id":"RET-DTW",  "demand":600,   "priority":2},
+    {"node_id":"RET-MIA",  "demand":900,   "priority":4},
+    {"node_id":"RET-PHI",  "demand":800,   "priority":3},
+    {"node_id":"RET-BOS",  "demand":650,   "priority":3},
+    {"node_id":"RET-CHI",  "demand":1200,  "priority":5},
+    {"node_id":"RET-NYC",  "demand":1800,  "priority":5}
+  ],
+
+  "objective": "balanced",
+  "quantum_iterations": 300,
+  "constraints": {
+    "lambda_time": 0.4,
+    "demand_penalty_scale": 8.0,
+    "capacity_penalty_scale": 6.0
+  }
+}

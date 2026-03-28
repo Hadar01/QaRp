@@ -1,0 +1,31 @@
+{
+    "nodes": [
+        {"id": "WH-A", "name": "Central Hub", "type": "warehouse", "capacity": 500, "current_inventory": 250},
+        {"id": "WH-B", "name": "Remote Hub", "type": "warehouse", "capacity": 500, "current_inventory": 250},
+        {"id": "S1", "name": "Priority Store", "type": "retail", "capacity": 300, "current_inventory": 10},
+        {"id": "S2", "name": "Bulk Store", "type": "retail", "capacity": 300, "current_inventory": 10},
+        {"id": "S3", "name": "Small Store", "type": "retail", "capacity": 200, "current_inventory": 5}
+    ],
+    "routes": [
+        {"from_node": "WH-A", "to_node": "S1", "distance": 50,  "cost_per_unit": 1.0,  "time_hours": 1.0, "capacity": 200},
+        {"from_node": "WH-B", "to_node": "S1", "distance": 150, "cost_per_unit": 3.0,  "time_hours": 3.0, "capacity": 200},
+        {"from_node": "WH-A", "to_node": "S2", "distance": 60,  "cost_per_unit": 1.0,  "time_hours": 1.0, "capacity": 150},
+        {"from_node": "WH-B", "to_node": "S2", "distance": 800, "cost_per_unit": 15.0, "time_hours": 12.0, "capacity": 150},
+        {"from_node": "WH-A", "to_node": "S3", "distance": 40,  "cost_per_unit": 1.0,  "time_hours": 0.5, "capacity": 100},
+        {"from_node": "WH-B", "to_node": "S3", "distance": 600, "cost_per_unit": 12.0, "time_hours": 10.0, "capacity": 100}
+    ],
+    "demands": [
+        {"node_id": "S1", "demand": 200, "priority": 5},
+        {"node_id": "S2", "demand": 150, "priority": 3},
+        {"node_id": "S3", "demand": 100, "priority": 2}
+    ],
+    "objective": "minimize_cost",
+    "quantum_iterations": 500,
+    "algorithm": "gradient_vqe",
+    "p_layers": 6,
+    "constraints": {
+        "demand_penalty_scale": 15.0,
+        "capacity_penalty_scale": 15.0
+    },
+    "_design": "6-qubit resource allocation trap: WH-A has 250 inventory, supplies all 3 stores at $1/unit but can only cover 2 of 3 (250 out of 450 needed). Greedy picks R0(WH-A>S1,$200) first by priority, depleting WH-A to 50, forcing S2+S3 onto expensive WH-B routes: $200+$2250+$1200=$3650+. Optimal: R1(WH-B>S1,$600)+R2(WH-A>S2,$150)+R4(WH-A>S3,$100) = $850 with WH-A=250/250. Quantum advantage: 4.47x."
+}
