@@ -1,4 +1,4 @@
-﻿"""
+"""
 test_qarp_paths.py — Verifies ALL QARP v0.4.3 code paths execute via mock
 ==========================================================================
 
@@ -87,7 +87,9 @@ def main():
             check(f'Backend {bt.value} returns engine', engine is not None)
 
     print('\n[4] Engine build(measurements) + run(parameters) pattern')
-    engine = build_qarp_engine(QARPConfig())
+    _cfg4 = QARPConfig()
+    _cfg4.backend_type = BackendType.QULACS_SINGLE
+    engine = build_qarp_engine(_cfg4)
     measurement = StateVector(bra=circuit, operator=qarp_ham, ket=circuit)
     engine.build(measurements=[measurement])
     ev = engine.run(parameters={s: 0.5 for s in symbols})
