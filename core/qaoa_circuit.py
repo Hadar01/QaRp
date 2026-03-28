@@ -48,28 +48,30 @@ from scipy.optimize import minimize
 
 from core.problem_encoder import IsingHamiltonian
 
-# Qulacs import — graceful fallback chain:
-#   1. On aarch64 (FX700 compute): skip qulacs entirely (binary segfaults)
-#   2. On x86_64: try real qulacs (fastest, C++ backend)
-#   3. Fallback: pure-numpy simulator (works everywhere, no C extensions)
-_ARCH = platform.machine().lower()
-if _ARCH in ('aarch64', 'arm64'):
-    # FX700 compute nodes: qulacs 0.6.1 aarch64 binary segfaults on QuantumState
+# Qulacs import — unified fallback chain (works on any platform):
+#   1. Try real qulacs (fastest, C++ backend)
+#   2. Fallback: pure-numpy simulator (works everywhere, no C extensions)
+#
+# On aarch64 (FX700 compute nodes):
+#   - If qulacs was built from source and installed → import succeeds
+#   - If only the broken pre-compiled binary exists → process segfaults
+#     (segfaults cannot be caught; user must install from source first)
+#   - If qulacs is not installed at all → ImportError → numpy fallback
+import logging as _logging
+_qlog = _logging.getLogger(__name__)
+
+try:
+    from qulacs import QuantumState, QuantumCircuit, Observable
+    QULACS_AVAILABLE = True
+    _qlog.info("Using qulacs C++ quantum simulator")
+except ImportError:
     try:
         from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
         QULACS_AVAILABLE = True
+        _qlog.info("Using pure-numpy quantum simulator (qulacs not available)")
     except ImportError:
         QULACS_AVAILABLE = False
-else:
-    try:
-        from qulacs import QuantumState, QuantumCircuit, Observable
-        QULACS_AVAILABLE = True
-    except ImportError:
-        try:
-            from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
-            QULACS_AVAILABLE = True
-        except ImportError:
-            QULACS_AVAILABLE = False
+        _qlog.warning("No quantum simulator available")
 
 
 class QAOACircuit:

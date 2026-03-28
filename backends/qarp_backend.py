@@ -103,29 +103,20 @@ try:
 except ImportError:
     QISKIT_AVAILABLE = False
 
-# ── Qulacs fallback (available in local dev env; mpiQulacs on FX700) ─────────
-# On aarch64 (FX700 compute nodes): skip qulacs entirely — binary segfaults
-_ARCH = platform.machine().lower()
-if _ARCH in ('aarch64', 'arm64'):
+# ── Qulacs fallback — unified (see qaoa_circuit.py for full docs) ────────
+# Try qulacs first on ALL platforms; fall back to numpy_simulator.
+try:
+    from qulacs import QuantumState, QuantumCircuit, Observable
+    QULACS_AVAILABLE = True
+    logging.info("Using qulacs C++ quantum simulator")
+except ImportError:
     try:
         from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
         QULACS_AVAILABLE = True
-        logging.info("aarch64 detected — using pure-numpy quantum simulator")
+        logging.info("Using pure-numpy quantum simulator (qulacs not available)")
     except ImportError:
         QULACS_AVAILABLE = False
-        logging.warning("numpy_simulator unavailable on aarch64. LOCAL_SIM disabled.")
-else:
-    try:
-        from qulacs import QuantumState, QuantumCircuit, Observable
-        QULACS_AVAILABLE = True
-    except ImportError:
-        try:
-            from core.numpy_simulator import QuantumState, QuantumCircuit, Observable
-            QULACS_AVAILABLE = True
-            logging.info("Using pure-numpy quantum simulator (qulacs unavailable)")
-        except ImportError:
-            QULACS_AVAILABLE = False
-            logging.warning("qulacs and numpy_simulator both unavailable.")
+        logging.warning("No quantum simulator available")
 
 from core.problem_encoder import IsingHamiltonian
 
@@ -341,13 +332,12 @@ class QARPOptimizer:
                 "Install it with: pip install qulacs\n"
                 "On FX700, use 'qulacs' or 'qulacs_mpi' backend instead."
             )
-        from core.qaoa_circuit import QAOACircuit, VQEOptimizer
+        from core.qaoa_circuit import QAOACircuit, GradientVQEOptimizer
         self._local_qaoa = QAOACircuit(self.ising, p_layers=self.p)
-        self._local_vqe  = VQEOptimizer(
+        self._local_vqe  = GradientVQEOptimizer(
             self._local_qaoa,
-            method=self.config.optimizer_method,
             max_iterations=self.config.max_iterations,
-            n_restarts=3,
+            n_restarts=5,
         )
 
     def optimize(self) -> dict:
