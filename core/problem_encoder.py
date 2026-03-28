@@ -253,6 +253,19 @@ class ProblemEncoder:
             norm_factor=norm_factor,
         )
 
+        # ── Step 8: flow conservation at intermediate nodes ────────────────
+        # For multi-hop supply chains (WH→DC→Retail), ensures that a DC's
+        # outbound routes are only energetically favorable when matching
+        # inbound routes are also selected.  Without this, QAOA selects
+        # last-mile routes without upstream supply.
+        flow_conservation_scale = float(constraints.get(
+            "flow_conservation_scale", max(demand_scale, capacity_scale)))
+        J, h, offset = self._add_flow_conservation_penalties(
+            nodes, routes, J=J, h=h, offset=offset,
+            lam_scale=flow_conservation_scale,
+            norm_factor=norm_factor,
+        )
+
         return IsingHamiltonian(
             n_qubits=n,
             J=J,
@@ -494,6 +507,121 @@ class ProblemEncoder:
             # Diagonal terms: Z_i^2 = 1, so lam * a_i^2 goes to offset
             for _, a_i in contribs:
                 offset += lam * a_i ** 2
+
+        return J, h, offset
+
+    # ------------------------------------------------------------------
+    # Flow conservation for intermediate nodes (multi-hop supply chains)
+    # ------------------------------------------------------------------
+
+    def _add_flow_conservation_penalties(
+        self,
+        nodes: list[SupplyNode],
+        routes: list[Route],
+        J: dict,
+        h: dict,
+        offset: float,
+        lam_scale: float,
+        norm_factor: float = 1.0,
+    ) -> tuple[dict, dict, float]:
+        """
+        For each intermediate node (distribution_center), penalise outflow
+        exceeding inflow + existing inventory:
+
+            λ_F * (Σ outflow − Σ inflow − I_node)²
+
+        This is CRITICAL for multi-hop supply chains (WH→DC→Retail):
+        without it, the optimizer selects last-mile routes (DC→Retail)
+        without selecting upstream routes (WH→DC), creating phantom flow.
+
+        The penalty creates ZZ couplings between upstream and downstream
+        routes, giving the quantum optimizer a reason to co-select them.
+        """
+        node_map = {nd.id: nd for nd in nodes}
+
+        for node_id, node in node_map.items():
+            # Only apply to intermediate nodes (distribution centers)
+            if node.type != "distribution_center":
+                continue
+
+            I_n = node.current_inventory / norm_factor
+            lam = lam_scale
+
+            outgoing = [(i, r) for i, r in enumerate(routes) if r.from_node == node_id]
+            incoming = [(i, r) for i, r in enumerate(routes) if r.to_node == node_id]
+
+            if not outgoing:
+                continue
+
+            # Ising substitution: x_i = (1 - Z_i) / 2
+            # outflow contribution: cap_out_i / 2  (positive when selected)
+            # inflow contribution:  cap_in_j / 2   (positive when selected)
+            # Penalty: lam * (sum_out_a - sum_in_a - I_n/2)^2
+            #   where out_a_i = cap_out_i / (2 * norm_factor)
+            #         in_a_j  = cap_in_j  / (2 * norm_factor)
+
+            out_contribs = [(i, (r.capacity / norm_factor) / 2.0) for i, r in outgoing]
+            in_contribs  = [(i, (r.capacity / norm_factor) / 2.0) for i, r in incoming]
+
+            sum_out = sum(a for _, a in out_contribs)
+            sum_in  = sum(a for _, a in in_contribs)
+
+            # Residual when no routes are selected (all Z_i = +1):
+            # R = sum_out - sum_in - I_n/2  (positive = outflow > inflow+inventory)
+            # When a route IS selected (Z_i → -1), its contribution flips sign.
+            # For outgoing: contribution reduces by 2*a_i (less excess)
+            # For incoming: contribution increases by 2*a_j (more supply)
+
+            # Only penalise if there's a potential flow violation
+            # (max outflow > max inflow + inventory)
+            if sum_out <= sum_in + I_n / 2.0:
+                continue
+
+            R = sum_out - sum_in - I_n / 2.0
+
+            # Constant: lam * R^2
+            offset += lam * R ** 2
+
+            # Linear terms for outgoing routes: +lam * 2 * R * a_i * Z_i
+            # (selecting outgoing route = Z_i→-1 reduces penalty)
+            for qi, a_i in out_contribs:
+                h[qi] = h.get(qi, 0.0) + lam * 2.0 * R * a_i
+
+            # Linear terms for incoming routes: -lam * 2 * R * a_j * Z_j
+            # (selecting incoming route = Z_j→-1 INCREASES supply, reducing penalty)
+            for qj, a_j in in_contribs:
+                h[qj] = h.get(qj, 0.0) - lam * 2.0 * R * a_j
+
+            # ZZ terms between outgoing pairs
+            for p in range(len(out_contribs)):
+                for q in range(p + 1, len(out_contribs)):
+                    qi, a_i = out_contribs[p]
+                    qj, a_j = out_contribs[q]
+                    key = (min(qi, qj), max(qi, qj))
+                    J[key] = J.get(key, 0.0) + lam * 2.0 * a_i * a_j
+
+            # ZZ terms between incoming pairs
+            for p in range(len(in_contribs)):
+                for q in range(p + 1, len(in_contribs)):
+                    qi, a_i = in_contribs[p]
+                    qj, a_j = in_contribs[q]
+                    key = (min(qi, qj), max(qi, qj))
+                    J[key] = J.get(key, 0.0) + lam * 2.0 * a_i * a_j
+
+            # ZZ terms between outgoing and incoming (CROSS-LAYER coupling)
+            # These are the critical terms: they couple upstream WH→DC
+            # routes with downstream DC→Retail routes.
+            # Sign: -lam * 2 * a_i * a_j (negative = co-selection preferred)
+            for qi, a_i in out_contribs:
+                for qj, a_j in in_contribs:
+                    key = (min(qi, qj), max(qi, qj))
+                    J[key] = J.get(key, 0.0) - lam * 2.0 * a_i * a_j
+
+            # Diagonal terms
+            for _, a_i in out_contribs:
+                offset += lam * a_i ** 2
+            for _, a_j in in_contribs:
+                offset += lam * a_j ** 2
 
         return J, h, offset
 
