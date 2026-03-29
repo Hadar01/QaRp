@@ -1,6 +1,6 @@
 # Executive Summary — Quantum Supply Chain Optimization
 
-**Fujitsu Quantum Supply Chain 2025 Hackathon Submission**
+
 
 ---
 
