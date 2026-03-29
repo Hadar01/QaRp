@@ -23,10 +23,14 @@ from core.problem_encoder import (
 from core.qaoa_circuit import (
     QAOACircuit, VQEOptimizer, SolutionDecoder,
     GradientVQEOptimizer, AdaptVQEOptimizer, VQDOptimizer,
+    ExactGroundStateOptimizer,
 )
 from core.advanced_algorithms import (
     WarmStartQAOA, MultiObjectiveParetoQAOA, CircuitCuttingPipeline,
     parse_supply_chain,
+)
+from core.advanced_optimizers import (
+    CVaRQAOAOptimizer, LayerByLayerOptimizer, RecursiveQAOA,
 )
 from core.error_mitigation import mitigate_qaoa
 
@@ -47,7 +51,7 @@ def load_problem(filepath):
     return nodes, routes, demands, ham, request
 
 
-def run_algorithm(name, ham, nodes, routes, demands, p=3, shots=1024):
+def run_algorithm(name, ham, nodes, routes, demands, p=3, shots=1024, max_iter=300):
     """Run a single algorithm and return results dict."""
     t0 = time.time()
     result = {}
@@ -55,7 +59,7 @@ def run_algorithm(name, ham, nodes, routes, demands, p=3, shots=1024):
     try:
         if name == "qaoa":
             qaoa = QAOACircuit(ham, p_layers=p)
-            vqe = VQEOptimizer(qaoa, max_iterations=200, n_restarts=3)
+            vqe = VQEOptimizer(qaoa, max_iterations=max_iter, n_restarts=5)
             res = vqe.optimize()
             bs, conf, _ = qaoa.get_best_bitstring(res["best_params"], n_shots=shots)
             result = {"energy": res["best_energy"], "bitstring": bs,
@@ -63,7 +67,7 @@ def run_algorithm(name, ham, nodes, routes, demands, p=3, shots=1024):
 
         elif name == "gradient_vqe":
             qaoa = QAOACircuit(ham, p_layers=p)
-            gvqe = GradientVQEOptimizer(qaoa, max_iterations=200, n_restarts=5)
+            gvqe = GradientVQEOptimizer(qaoa, max_iterations=max_iter, n_restarts=10)
             res = gvqe.optimize()
             bs, conf, _ = qaoa.get_best_bitstring(res["best_params"], n_shots=shots)
             result = {"energy": res["best_energy"], "bitstring": bs,
@@ -112,6 +116,45 @@ def run_algorithm(name, ham, nodes, routes, demands, p=3, shots=1024):
             result = {"energy": res["combined_energy"],
                       "bitstring": res["combined_bitstring"],
                       "n_fragments": res["n_fragments"]}
+
+        elif name == "exact":
+            exact = ExactGroundStateOptimizer(ham)
+            res = exact.optimize()
+            result = {"energy": res["best_energy"], "bitstring": res["best_bitstring"],
+                      "confidence": 1.0, "converged": True,
+                      "method": "exact_ground_state",
+                      "search_space": 2 ** ham.n_qubits}
+
+        elif name == "rqaoa":
+            rqaoa_opt = RecursiveQAOA(
+                ham, qaoa_p=min(2, p), threshold=min(3, ham.n_qubits),
+                qaoa_restarts=3, qaoa_max_iter=150,
+            )
+            res = rqaoa_opt.optimize()
+            result = {"energy": res["best_energy"], "bitstring": res["best_bitstring"],
+                      "confidence": 1.0, "converged": True,
+                      "method": "rqaoa",
+                      "n_reductions": res.get("n_reductions", 0),
+                      "reduction_log": res.get("reduction_log", [])}
+
+        elif name == "cvar_qaoa":
+            qaoa = QAOACircuit(ham, p_layers=p)
+            cvar = CVaRQAOAOptimizer(qaoa, max_iterations=max_iter, n_restarts=8)
+            res = cvar.optimize()
+            bs, conf, _ = qaoa.get_best_bitstring(res["best_params"], n_shots=shots)
+            result = {"energy": res["best_energy"], "bitstring": bs,
+                      "confidence": conf, "converged": res["converged"]}
+
+        elif name == "layer_by_layer":
+            lbl = LayerByLayerOptimizer(ham, target_p=p,
+                                        max_iter_per_layer=150,
+                                        max_iter_refinement=300)
+            res = lbl.optimize()
+            qaoa_decode = QAOACircuit(ham, p_layers=p)
+            bs, conf, _ = qaoa_decode.get_best_bitstring(res["best_params"], n_shots=shots)
+            result = {"energy": res["best_energy"], "bitstring": bs,
+                      "confidence": conf, "converged": res["converged"],
+                      "layer_energies": res.get("layer_energies", [])}
 
     except Exception as e:
         result = {"error": str(e)}
@@ -163,7 +206,8 @@ def main():
     args = parser.parse_args()
 
     if args.algorithms == "all":
-        algorithms = ["qaoa", "gradient_vqe", "adapt_vqe", "vqd",
+        algorithms = ["exact", "rqaoa", "cvar_qaoa", "layer_by_layer",
+                       "qaoa", "gradient_vqe", "adapt_vqe", "vqd",
                        "warm_start", "pareto", "circuit_cut"]
     else:
         algorithms = args.algorithms.split(",")
@@ -195,6 +239,10 @@ def main():
         if optimal_energy is not None:
             print(f"  Optimal energy (brute-force): {optimal_energy:.4f}")
 
+        # Read problem-specific settings from the request JSON
+        req_p = request.get("p_layers", args.layers)
+        req_iter = request.get("quantum_iterations", 300)
+
         # Run algorithms
         problem_results = {"n_qubits": n_qubits, "greedy_cost": greedy_cost,
                            "optimal_energy": optimal_energy, "algorithms": {}}
@@ -204,7 +252,8 @@ def main():
 
         for algo in algorithms:
             if algo not in ["pareto", "circuit_cut"] or n_qubits >= 4:
-                res = run_algorithm(algo, ham, nodes, routes, demands, p=args.layers)
+                res = run_algorithm(algo, ham, nodes, routes, demands,
+                                    p=req_p, max_iter=req_iter)
 
                 if "error" in res:
                     print(f"  {algo:<16} ERROR: {res['error'][:40]}")

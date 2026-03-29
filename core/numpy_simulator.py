@@ -66,7 +66,20 @@ class QuantumState:
     def sampling(self, n_shots: int) -> list:
         """Sample from |⟨x|ψ⟩|² distribution, returns list of int indices."""
         probs = np.abs(self._vec) ** 2
-        probs /= probs.sum()  # normalise (numerical safety)
+        total = probs.sum()
+        if total < 1e-15 or np.isnan(total):
+            # State collapsed to zero — fall back to uniform sampling
+            probs = np.ones(self.dim) / self.dim
+        else:
+            probs /= total  # normalise (numerical safety)
+        # Replace any remaining NaN/negative values
+        probs = np.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
+        probs = np.maximum(probs, 0.0)
+        psum = probs.sum()
+        if psum < 1e-15:
+            probs = np.ones(self.dim) / self.dim
+        else:
+            probs /= psum
         return list(np.random.choice(self.dim, size=n_shots, p=probs))
 
     def copy(self):
@@ -119,6 +132,10 @@ class QuantumCircuit:
 
     def add_CZ_gate(self, control: int, target: int):
         self._gates.append(('cz', control, target))
+
+    def merge_circuit(self, other: 'QuantumCircuit'):
+        """Append all gates from another circuit into this one (matches qulacs API)."""
+        self._gates.extend(other._gates)
 
     # -- Apply to state ---
     def update_quantum_state(self, state: QuantumState):

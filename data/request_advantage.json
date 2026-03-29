@@ -20,8 +20,8 @@
         {"node_id": "S3", "demand": 100, "priority": 2}
     ],
     "objective": "minimize_cost",
-    "quantum_iterations": 500,
-    "algorithm": "gradient_vqe",
+    "quantum_iterations": 800,
+    "algorithm": "rqaoa",
     "p_layers": 6,
     "constraints": {
         "demand_penalty_scale": 15.0,

@@ -45,6 +45,10 @@ from core.problem_encoder import (
 from core.qaoa_circuit import (
     QAOACircuit, VQEOptimizer, SolutionDecoder,
     GradientVQEOptimizer, AdaptVQEOptimizer, VQDOptimizer,
+    ExactGroundStateOptimizer,
+)
+from core.advanced_optimizers import (
+    CVaRQAOAOptimizer, LayerByLayerOptimizer, RecursiveQAOA,
 )
 
 # Phase 2 modules
@@ -113,6 +117,10 @@ class AlgorithmChoice(str, Enum):
     warm_start    = "warm_start"     # CVaR warm-start from greedy
     pareto        = "pareto"         # Multi-objective Pareto exploration
     circuit_cut   = "circuit_cut"    # Circuit cutting for 40+ qubits
+    exact         = "exact"          # Exact ground state (brute-force, ≤20 qubits)
+    rqaoa         = "rqaoa"          # Recursive QAOA (correlation-based reduction)
+    cvar_qaoa     = "cvar_qaoa"      # CVaR-QAOA (tail-risk optimisation)
+    layer_by_layer = "layer_by_layer" # Layer-by-layer incremental depth
 
 
 class SupplyNodeSchema(BaseModel):
@@ -485,6 +493,16 @@ def run_optimization_pipeline(request_dict: dict) -> dict:
     algorithm = request.algorithm.value
     extra_data = {}
 
+    # Auto-upgrade: standard QAOA struggles on 10+ qubit landscapes.
+    # Gradient VQE (L-BFGS-B + COBYLA refinement) converges far more
+    # reliably for these problem sizes.
+    if algorithm == "qaoa" and n_qubits >= 10:
+        algorithm = "gradient_vqe"
+        logger.info(
+            f"Auto-upgraded algorithm qaoa → gradient_vqe for {n_qubits}-qubit problem "
+            f"(better convergence for n≥10)"
+        )
+
     # --- PARETO: returns its own structured result ---
     if algorithm == "pareto":
         pareto = MultiObjectiveParetoQAOA(
@@ -579,10 +597,67 @@ def run_optimization_pipeline(request_dict: dict) -> dict:
             max_iterations=max(50, request.quantum_iterations // p_layers),
         )
 
-        if algorithm == "gradient_vqe":
+        if algorithm == "exact":
+            # Exact ground state for small problems — proves Hamiltonian correctness
+            exact_opt = ExactGroundStateOptimizer(hamiltonian)
+            vqe_result = exact_opt.optimize()
+            # Use the exact bitstring directly (no QAOA sampling needed)
+            bitstring = vqe_result["best_bitstring"]
+            confidence = 1.0
+            decoder = SolutionDecoder()
+            plan = decoder.decode(bitstring, hamiltonian, core_routes, core_nodes, core_demands)
+            extra_data["exact_info"] = {
+                "method": "exact_ground_state",
+                "search_space": 2 ** n_qubits,
+            }
+            # Skip the normal bitstring decoding below
+            best_params = vqe_result["best_params"]
+        elif algorithm == "rqaoa":
+            # Recursive QAOA — correlation-based recursive reduction
+            rqaoa_opt = RecursiveQAOA(
+                hamiltonian,
+                qaoa_p=min(2, p_layers),
+                threshold=min(3, n_qubits),
+                qaoa_restarts=3,
+                qaoa_max_iter=150,
+            )
+            vqe_result = rqaoa_opt.optimize()
+            bitstring = vqe_result["best_bitstring"]
+            confidence = 1.0
+            decoder = SolutionDecoder()
+            plan = decoder.decode(bitstring, hamiltonian, core_routes, core_nodes, core_demands)
+            extra_data["rqaoa_info"] = {
+                "method": "rqaoa",
+                "n_reductions": vqe_result.get("n_reductions", 0),
+                "final_n_qubits": vqe_result.get("final_n_qubits", 0),
+                "reduction_log": vqe_result.get("reduction_log", []),
+            }
+            best_params = vqe_result["best_params"]
+        elif algorithm == "cvar_qaoa":
+            # CVaR-QAOA — tail-risk focused optimisation
+            qaoa = QAOACircuit(hamiltonian, p_layers=p_layers)
+            cvar_opt = CVaRQAOAOptimizer(
+                qaoa,
+                alpha_start=0.5, alpha_end=0.1,
+                n_shots=2048,
+                max_iterations=request.quantum_iterations,
+                n_restarts=8,
+            )
+            vqe_result = cvar_opt.optimize()
+        elif algorithm == "layer_by_layer":
+            # Layer-by-layer incremental circuit depth
+            lbl_opt = LayerByLayerOptimizer(
+                hamiltonian,
+                target_p=p_layers,
+                max_iter_per_layer=150,
+                max_iter_refinement=300,
+                n_restarts_first=5,
+            )
+            vqe_result = lbl_opt.optimize()
+        elif algorithm == "gradient_vqe":
             qaoa = QAOACircuit(hamiltonian, p_layers=p_layers)
             opt = GradientVQEOptimizer(qaoa, max_iterations=request.quantum_iterations,
-                                       n_restarts=3)
+                                       n_restarts=5)
             vqe_result = opt.optimize()
         elif algorithm == "adapt_vqe":
             opt = AdaptVQEOptimizer(hamiltonian, max_p=min(p_layers + 3, 8),
@@ -615,17 +690,18 @@ def run_optimization_pipeline(request_dict: dict) -> dict:
             else:
                 vqe_result = optimizer.optimize()
 
-        best_params = vqe_result["best_params"]
+        if algorithm not in ("exact", "rqaoa"):
+            best_params = vqe_result["best_params"]
 
-        # Noise simulation
-        if request.noise_simulation:
-            best_params = _apply_noise_to_params(best_params)
+            # Noise simulation
+            if request.noise_simulation:
+                best_params = _apply_noise_to_params(best_params)
 
-        # Decode bitstring
-        qaoa_for_decode = QAOACircuit(hamiltonian, p_layers=p_layers)
-        bitstring, confidence, _ = qaoa_for_decode.get_best_bitstring(best_params, n_shots=1000)
-        decoder = SolutionDecoder()
-        plan = decoder.decode(bitstring, hamiltonian, core_routes, core_nodes, core_demands)
+            # Decode bitstring
+            qaoa_for_decode = QAOACircuit(hamiltonian, p_layers=p_layers)
+            bitstring, confidence, _ = qaoa_for_decode.get_best_bitstring(best_params, n_shots=1000)
+            decoder = SolutionDecoder()
+            plan = decoder.decode(bitstring, hamiltonian, core_routes, core_nodes, core_demands)
 
     # ── ZNE Error Mitigation ───────────────────────────────────────────────
     zne_result = None

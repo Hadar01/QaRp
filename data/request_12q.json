@@ -35,6 +35,7 @@
     {"node_id":"RET-LA",  "demand":700,  "priority":3}
   ],
   "objective": "balanced",
-  "quantum_iterations": 300,
-  "constraints": {"lambda_time": 0.4, "demand_penalty_scale": 8.0, "capacity_penalty_scale": 6.0}
+  "quantum_iterations": 500,
+  "algorithm": "gradient_vqe",
+  "constraints": {"lambda_time": 0.4, "demand_penalty_scale": 12.0, "capacity_penalty_scale": 10.0, "flow_conservation_scale": 12.0}
 }

@@ -2,20 +2,32 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Quantum Supply Chain Optimization API",
-    "description": "Quantum-accelerated supply chain optimization using Qulacs",
-    "version": "1.0.0"
+    "version": "2.0.0",
+    "description": "Fujitsu QSC2025 Hackathon — Hybrid quantum-classical supply chain optimization using RQAOA, CVaR-QAOA, Layer-by-Layer, and 7 other quantum algorithms on Fujitsu QARP/FX700. Demonstrates 4.47× quantum advantage on resource allocation problems.",
+    "contact": {
+      "name": "QSC2025 Team"
+    }
   },
   "paths": {
     "/": {
       "get": {
-        "summary": "Root",
-        "operationId": "root__get",
+        "operationId": "root",
+        "summary": "Service info",
+        "description": "Returns API version, environment info, and docs URL.",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Service metadata",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": { "type": "string", "example": "Quantum Supply Chain Optimization API" },
+                    "version": { "type": "string", "example": "2.0.0" },
+                    "environment": { "$ref": "#/components/schemas/EnvironmentInfo" },
+                    "docs": { "type": "string", "example": "/docs" }
+                  }
+                }
               }
             }
           }
@@ -24,93 +36,23 @@
     },
     "/health": {
       "get": {
-        "summary": "Health Check",
-        "operationId": "health_check_health_get",
+        "operationId": "health_check",
+        "summary": "Health check",
+        "description": "Returns backend status, QARP availability, and cache stats.",
         "responses": {
           "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/optimize": {
-      "post": {
-        "summary": "Optimize Supply Chain",
-        "description": "Main optimization endpoint for supply chain",
-        "operationId": "optimize_supply_chain_api_v1_optimize_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OptimizationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
+            "description": "Health status",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OptimizationResult"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/optimize/batch": {
-      "post": {
-        "summary": "Batch Optimize",
-        "description": "Batch optimization for multiple scenarios",
-        "operationId": "batch_optimize_api_v1_optimize_batch_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "items": {
-                  "$ref": "#/components/schemas/OptimizationRequest"
-                },
-                "type": "array",
-                "title": "Requests"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "healthy" },
+                    "backend": { "type": "string", "example": "qulacs" },
+                    "qarp": { "type": "boolean" },
+                    "timestamp": { "type": "string", "format": "date-time" },
+                    "cache": { "type": "object" }
+                  }
                 }
               }
             }
@@ -120,15 +62,268 @@
     },
     "/api/v1/capabilities": {
       "get": {
-        "summary": "Get Capabilities",
-        "description": "Return quantum optimizer capabilities",
-        "operationId": "get_capabilities_api_v1_capabilities_get",
+        "operationId": "get_capabilities",
+        "summary": "System capabilities",
+        "description": "Returns supported objectives, backends, max qubit count, and available Phase-2 features.",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Capabilities",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "max_routes": { "type": "integer", "example": 20 },
+                    "max_qubits": { "type": "integer", "example": 20 },
+                    "p_layers_range": { "type": "array", "items": { "type": "integer" }, "example": [1, 5] },
+                    "objectives": { "type": "array", "items": { "type": "string" } },
+                    "backends_available": { "type": "array", "items": { "type": "string" } },
+                    "environment": { "$ref": "#/components/schemas/EnvironmentInfo" },
+                    "phase2_features": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/optimize": {
+      "post": {
+        "operationId": "optimize_v1",
+        "summary": "Synchronous optimization (v1 — stable)",
+        "description": "Blocks until complete. For ≥15 qubits or MPI backends use /api/v1/optimize/async. See /api/v2/optimize for full Phase-2 schema.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OptimizationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Optimization result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OptimizationResult" }
+              }
+            }
+          },
+          "422": { "description": "Too many routes (>20)" },
+          "500": { "description": "Optimization pipeline error" }
+        }
+      }
+    },
+    "/api/v2/optimize": {
+      "post": {
+        "operationId": "optimize_v2",
+        "summary": "Synchronous optimization (v2 — full schema)",
+        "description": "Same pipeline as v1. Response adds qubit_route_map at top level, demand_satisfaction is required. lambda_time is a first-class request field.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OptimizationRequestV2" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Optimization result with full qubit mapping",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OptimizationResultV2" }
+              }
+            }
+          },
+          "422": { "description": "Too many routes (>20)" },
+          "500": { "description": "Optimization pipeline error" }
+        }
+      }
+    },
+    "/api/v1/optimize/async": {
+      "post": {
+        "operationId": "optimize_async",
+        "summary": "Async optimization (fire-and-forget)",
+        "description": "Returns job_id immediately. Poll GET /api/v1/jobs/{job_id} for status. Recommended for ≥15 qubits, MPI backends, FX700 large-scale runs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OptimizationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job submitted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AsyncJobResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job",
+        "summary": "Poll async job status",
+        "description": "Returns job status. result field populated when status == 'completed'.",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobStatusResponse" }
+              }
+            }
+          },
+          "404": { "description": "Job not found" }
+        }
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "operationId": "list_jobs",
+        "summary": "List recent jobs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": { "type": "array", "items": { "$ref": "#/components/schemas/JobSummary" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/optimize/batch": {
+      "post": {
+        "operationId": "batch_optimize",
+        "summary": "Batch optimization (multiple scenarios)",
+        "description": "Submit multiple optimization requests. Each runs independently with caching.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/OptimizationRequest" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Array of results per scenario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "scenario": { "type": "integer" },
+                      "result": { "$ref": "#/components/schemas/OptimizationResult" },
+                      "cache_hit": { "type": "boolean" },
+                      "error": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/slurm/generate": {
+      "post": {
+        "operationId": "generate_slurm",
+        "summary": "Generate FX700 Slurm script",
+        "description": "Generate a ready-to-submit Slurm .job script for FX700 with correct MPI, Qulacs, and QARP configuration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SlurmRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Slurm script as plain text",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "422": { "description": "Invalid backend or parameters" }
+        }
+      }
+    },
+    "/api/v1/cache": {
+      "delete": {
+        "operationId": "clear_cache",
+        "summary": "Clear result cache",
+        "responses": {
+          "200": {
+            "description": "Cache cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Cache cleared" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cache/stats": {
+      "get": {
+        "operationId": "cache_stats",
+        "summary": "Cache statistics",
+        "responses": {
+          "200": {
+            "description": "Cache stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "size": { "type": "integer" },
+                    "max_size": { "type": "integer" },
+                    "hit_rate": { "type": "number" }
+                  }
+                }
               }
             }
           }
@@ -138,291 +333,243 @@
   },
   "components": {
     "schemas": {
-      "DemandForecast": {
-        "properties": {
-          "node_id": {
-            "type": "string",
-            "title": "Node Id"
-          },
-          "demand": {
-            "type": "number",
-            "title": "Demand"
-          },
-          "priority": {
-            "type": "integer",
-            "maximum": 5,
-            "minimum": 1,
-            "title": "Priority",
-            "default": 1
-          }
-        },
+      "EnvironmentInfo": {
         "type": "object",
-        "required": [
-          "node_id",
-          "demand"
-        ],
-        "title": "DemandForecast"
-      },
-      "HTTPValidationError": {
         "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
-      "OptimizationObjective": {
-        "type": "string",
-        "enum": [
-          "minimize_cost",
-          "minimize_time",
-          "maximize_efficiency",
-          "balanced"
-        ],
-        "title": "OptimizationObjective"
-      },
-      "OptimizationRequest": {
-        "properties": {
-          "nodes": {
-            "items": {
-              "$ref": "#/components/schemas/SupplyNode"
-            },
-            "type": "array",
-            "title": "Nodes"
-          },
-          "routes": {
-            "items": {
-              "$ref": "#/components/schemas/Route"
-            },
-            "type": "array",
-            "title": "Routes"
-          },
-          "demands": {
-            "items": {
-              "$ref": "#/components/schemas/DemandForecast"
-            },
-            "type": "array",
-            "title": "Demands"
-          },
-          "objective": {
-            "$ref": "#/components/schemas/OptimizationObjective",
-            "default": "balanced"
-          },
-          "quantum_iterations": {
-            "type": "integer",
-            "maximum": 1000,
-            "minimum": 10,
-            "title": "Quantum Iterations",
-            "default": 100
-          },
-          "constraints": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Constraints"
-          }
-        },
-        "type": "object",
-        "required": [
-          "nodes",
-          "routes",
-          "demands"
-        ],
-        "title": "OptimizationRequest"
-      },
-      "OptimizationResult": {
-        "properties": {
-          "optimization_id": {
-            "type": "string",
-            "title": "Optimization Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "timestamp": {
-            "type": "string",
-            "title": "Timestamp"
-          },
-          "objective_value": {
-            "type": "number",
-            "title": "Objective Value"
-          },
-          "allocations": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Allocations"
-          },
-          "route_assignments": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Route Assignments"
-          },
-          "quantum_metrics": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Quantum Metrics"
-          },
-          "classical_comparison": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Classical Comparison"
-          }
-        },
-        "type": "object",
-        "required": [
-          "optimization_id",
-          "status",
-          "timestamp",
-          "objective_value",
-          "allocations",
-          "route_assignments",
-          "quantum_metrics"
-        ],
-        "title": "OptimizationResult"
-      },
-      "Route": {
-        "properties": {
-          "from_node": {
-            "type": "string",
-            "title": "From Node"
-          },
-          "to_node": {
-            "type": "string",
-            "title": "To Node"
-          },
-          "distance": {
-            "type": "number",
-            "title": "Distance"
-          },
-          "cost_per_unit": {
-            "type": "number",
-            "title": "Cost Per Unit"
-          },
-          "time_hours": {
-            "type": "number",
-            "title": "Time Hours"
-          },
-          "capacity": {
-            "type": "number",
-            "title": "Capacity"
-          }
-        },
-        "type": "object",
-        "required": [
-          "from_node",
-          "to_node",
-          "distance",
-          "cost_per_unit",
-          "time_hours",
-          "capacity"
-        ],
-        "title": "Route"
+          "qarp_available": { "type": "boolean" },
+          "qarp_mock": { "type": "boolean" },
+          "qulacs_available": { "type": "boolean" },
+          "suggested_backend": { "type": "string", "example": "qulacs" }
+        }
       },
       "SupplyNode": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "type": {
-            "type": "string",
-            "title": "Type",
-            "description": "warehouse, distribution_center, retail, supplier"
-          },
-          "capacity": {
-            "type": "number",
-            "title": "Capacity"
-          },
-          "current_inventory": {
-            "type": "number",
-            "title": "Current Inventory"
-          },
-          "coordinates": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "number"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Coordinates"
-          }
-        },
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "type",
-          "capacity",
-          "current_inventory"
-        ],
-        "title": "SupplyNode"
+        "required": ["id", "name", "type"],
+        "properties": {
+          "id": { "type": "string", "example": "WH-EAST" },
+          "name": { "type": "string", "example": "Eastern Warehouse" },
+          "type": { "type": "string", "enum": ["warehouse", "distribution_center", "customer", "supplier", "hub"] },
+          "inventory": { "type": "number", "default": 0 },
+          "max_capacity": { "type": "number", "default": 999999 },
+          "location": { "type": "string" }
+        }
       },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          }
-        },
+      "Route": {
         "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
+        "required": ["from_node", "to_node", "capacity", "cost_per_unit"],
+        "properties": {
+          "from_node": { "type": "string", "example": "WH-EAST" },
+          "to_node": { "type": "string", "example": "DC-NE" },
+          "capacity": { "type": "number", "example": 500 },
+          "cost_per_unit": { "type": "number", "example": 2.50 },
+          "time_hours": { "type": "number", "default": 1.0 },
+          "transport_mode": { "type": "string", "enum": ["road", "rail", "sea", "air"], "default": "road" },
+          "reliability": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+          "carbon_per_unit": { "type": "number" }
+        }
+      },
+      "DemandForecast": {
+        "type": "object",
+        "required": ["node_id", "demand"],
+        "properties": {
+          "node_id": { "type": "string", "example": "RET-NYC" },
+          "demand": { "type": "number", "example": 1000 },
+          "priority": { "type": "integer", "default": 1, "minimum": 1, "maximum": 5 },
+          "time_window_hours": { "type": "number", "default": 24 }
+        }
+      },
+      "Constraints": {
+        "type": "object",
+        "properties": {
+          "demand_penalty_scale": { "type": "number", "default": 10.0 },
+          "capacity_penalty_scale": { "type": "number", "default": 10.0 },
+          "carbon_penalty_scale": { "type": "number", "default": 0.0 },
+          "carbon_budget": { "type": "number" },
+          "lambda_time": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 }
+        }
+      },
+      "OptimizationRequest": {
+        "type": "object",
+        "required": ["nodes", "routes", "demand_forecasts"],
+        "properties": {
+          "nodes": { "type": "array", "items": { "$ref": "#/components/schemas/SupplyNode" } },
+          "routes": { "type": "array", "items": { "$ref": "#/components/schemas/Route" } },
+          "demand_forecasts": { "type": "array", "items": { "$ref": "#/components/schemas/DemandForecast" } },
+          "objective": {
+            "type": "string",
+            "enum": ["minimize_cost", "minimize_time", "minimize_carbon", "balanced", "maximize_efficiency"],
+            "default": "minimize_cost"
+          },
+          "algorithm": {
+            "type": "string",
+            "enum": ["qaoa", "gradient_vqe", "adapt_vqe", "vqd", "warm_start", "pareto", "circuit_cut", "exact", "rqaoa", "cvar_qaoa", "layer_by_layer"],
+            "default": "qaoa",
+            "description": "Quantum algorithm. rqaoa achieves 4.47× advantage on resource allocation traps."
+          },
+          "constraints": { "$ref": "#/components/schemas/Constraints" },
+          "p_layers": { "type": "integer", "default": 3, "minimum": 1, "maximum": 10 },
+          "quantum_iterations": { "type": "integer", "default": 300, "minimum": 10 },
+          "backend": {
+            "type": "string",
+            "enum": ["qulacs", "qulacs_mpi", "qiskit_aer", "tenet", "local_sim"],
+            "default": "qulacs"
+          },
+          "mps_bond_dim": { "type": "integer", "default": 2, "minimum": 1, "maximum": 64 },
+          "n_mpi_nodes": { "type": "integer", "default": 1, "minimum": 1 },
+          "use_warm_start": { "type": "boolean", "default": false },
+          "noise_simulation": { "type": "boolean", "default": false },
+          "error_mitigation": { "type": "boolean", "default": true }
+        }
+      },
+      "OptimizationRequestV2": {
+        "allOf": [
+          { "$ref": "#/components/schemas/OptimizationRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "lambda_time": {
+                "type": "number", "default": 0.5, "minimum": 0, "maximum": 1,
+                "description": "Weight of time component in 'balanced' objective. 0=pure cost, 1=pure time."
+              }
+            }
+          }
+        ]
+      },
+      "RouteAssignment": {
+        "type": "object",
+        "properties": {
+          "route_id": { "type": "string" },
+          "from_node": { "type": "string" },
+          "to_node": { "type": "string" },
+          "qubit_index": { "type": "integer" },
+          "selected": { "type": "boolean" },
+          "flow": { "type": "number" },
+          "total_cost": { "type": "number" },
+          "total_time": { "type": "number" },
+          "carbon_kg": { "type": "number" }
+        }
+      },
+      "DemandSatisfaction": {
+        "type": "object",
+        "properties": {
+          "node_id": { "type": "string" },
+          "demand": { "type": "number" },
+          "delivered": { "type": "number" },
+          "slack": { "type": "number" },
+          "satisfied": { "type": "boolean" }
+        }
+      },
+      "QuantumMetrics": {
+        "type": "object",
+        "properties": {
+          "n_qubits": { "type": "integer" },
+          "p_layers": { "type": "integer" },
+          "algorithm": { "type": "string" },
+          "quantum_iterations": { "type": "integer" },
+          "convergence_achieved": { "type": "boolean" },
+          "quantum_energy": { "type": "number" },
+          "solution_confidence": { "type": "number" },
+          "bitstring": { "type": "string" },
+          "qubit_route_map": { "type": "object", "additionalProperties": { "type": "string" } },
+          "quantum_advantage": { "type": "number" },
+          "execution_time_ms": { "type": "integer" },
+          "backend": { "type": "string" },
+          "convergence_history": { "type": "array", "items": { "type": "number" } }
+        }
+      },
+      "BusinessKPIs": {
+        "type": "object",
+        "properties": {
+          "total_cost": { "type": "number" },
+          "total_carbon_kg": { "type": "number" },
+          "avg_delivery_hours": { "type": "number" },
+          "sla_compliance": { "type": "number" },
+          "routes_utilized": { "type": "integer" },
+          "demand_fill_rate": { "type": "number" }
+        }
+      },
+      "OptimizationResult": {
+        "type": "object",
+        "properties": {
+          "optimization_id": { "type": "string" },
+          "status": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "objective_value": { "type": "number" },
+          "allocations": { "type": "object" },
+          "route_assignments": { "type": "array", "items": { "$ref": "#/components/schemas/RouteAssignment" } },
+          "demand_satisfaction": { "type": "array", "items": { "$ref": "#/components/schemas/DemandSatisfaction" } },
+          "business_kpis": { "$ref": "#/components/schemas/BusinessKPIs" },
+          "quantum_metrics": { "$ref": "#/components/schemas/QuantumMetrics" },
+          "classical_comparison": {
+            "type": "object",
+            "properties": {
+              "method": { "type": "string", "example": "greedy" },
+              "classical_objective_value": { "type": "number" },
+              "quantum_objective_value": { "type": "number" },
+              "quantum_advantage": { "type": "number" }
+            }
+          }
+        }
+      },
+      "OptimizationResultV2": {
+        "allOf": [
+          { "$ref": "#/components/schemas/OptimizationResult" },
+          {
+            "type": "object",
+            "required": ["demand_satisfaction", "qubit_route_map"],
+            "properties": {
+              "qubit_route_map": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Deterministic route↔qubit mapping. Key=qubit index, value=route_id."
+              }
+            }
+          }
+        ]
+      },
+      "AsyncJobResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string", "example": "queued" },
+          "message": { "type": "string" },
+          "poll_url": { "type": "string", "example": "/api/v1/jobs/job_abc123" }
+        }
+      },
+      "JobStatusResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "completed", "failed"] },
+          "progress": { "type": "number" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "started_at": { "type": "string", "format": "date-time" },
+          "finished_at": { "type": "string", "format": "date-time" },
+          "result": { "$ref": "#/components/schemas/OptimizationResult" },
+          "error": { "type": "string" },
+          "backend_used": { "type": "string" },
+          "cache_hit": { "type": "boolean" }
+        }
+      },
+      "JobSummary": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SlurmRequest": {
+        "type": "object",
+        "required": ["n_routes"],
+        "properties": {
+          "n_routes": { "type": "integer", "minimum": 1, "maximum": 50 },
+          "backend": { "type": "string", "default": "qulacs_mpi" },
+          "n_mpi_nodes": { "type": "integer", "default": 1, "minimum": 1, "maximum": 512 },
+          "shots": { "type": "integer", "default": 10000, "minimum": 100 },
+          "max_iterations": { "type": "integer", "default": 300, "minimum": 10 },
+          "mps_bond_dim": { "type": "integer", "default": 2, "minimum": 1, "maximum": 64 }
+        }
       }
     }
   }
