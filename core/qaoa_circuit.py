@@ -48,15 +48,16 @@ from scipy.optimize import minimize
 
 from core.problem_encoder import IsingHamiltonian
 
+# MPI initialization — MUST happen before qulacs import on FX700.
+# MPI-enabled qulacs segfaults unless MPI runtime is initialized first.
+try:
+    from mpi4py import MPI  # noqa: F401
+except ImportError:
+    pass  # not on an MPI system — fine
+
 # Qulacs import — unified fallback chain (works on any platform):
 #   1. Try real qulacs (fastest, C++ backend)
 #   2. Fallback: pure-numpy simulator (works everywhere, no C extensions)
-#
-# On aarch64 (FX700 compute nodes):
-#   - If qulacs was built from source and installed → import succeeds
-#   - If only the broken pre-compiled binary exists → process segfaults
-#     (segfaults cannot be caught; user must install from source first)
-#   - If qulacs is not installed at all → ImportError → numpy fallback
 import logging as _logging
 _qlog = _logging.getLogger(__name__)
 

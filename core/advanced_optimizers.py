@@ -30,6 +30,12 @@ from core.qaoa_circuit import (
     QAOACircuit, VQEOptimizer, ExactGroundStateOptimizer,
 )
 
+# MPI initialization — MUST happen before qulacs import on FX700
+try:
+    from mpi4py import MPI  # noqa: F401
+except ImportError:
+    pass
+
 # Use the same Qulacs / numpy-simulator fallback chain
 try:
     from qulacs import QuantumState, QuantumCircuit, Observable
