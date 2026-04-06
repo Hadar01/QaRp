@@ -32,6 +32,7 @@ from core.advanced_algorithms import (
 from core.advanced_optimizers import (
     CVaRQAOAOptimizer, LayerByLayerOptimizer, RecursiveQAOA,
 )
+from core.scalable_rqaoa import ScalableRQAOA
 from core.error_mitigation import mitigate_qaoa
 
 
@@ -254,6 +255,18 @@ def run_algorithm(name, ham, nodes, routes, demands, p=3, shots=1024, max_iter=3
                       "confidence": conf, "converged": res["converged"],
                       "layer_energies": res.get("layer_energies", [])}
 
+        elif name == "scalable_rqaoa":
+            srqaoa = ScalableRQAOA(
+                ham, qaoa_p=min(2, p), threshold=min(3, ham.n_qubits),
+                qaoa_restarts=3, qaoa_max_iter=100,
+            )
+            res = srqaoa.optimize()
+            result = {"energy": res["best_energy"], "bitstring": res["best_bitstring"],
+                      "confidence": 1.0, "converged": True,
+                      "method": "scalable_rqaoa",
+                      "n_reductions": res.get("n_reductions", 0),
+                      "reduction_log": res.get("reduction_log", [])}
+
     except Exception as e:
         result = {"error": str(e)}
 
@@ -304,7 +317,8 @@ def main():
     args = parser.parse_args()
 
     if args.algorithms == "all":
-        algorithms = ["exact", "rqaoa", "cvar_qaoa", "layer_by_layer",
+        algorithms = ["exact", "rqaoa", "scalable_rqaoa", "cvar_qaoa",
+                       "layer_by_layer",
                        "qaoa", "gradient_vqe", "adapt_vqe", "vqd",
                        "warm_start", "pareto", "circuit_cut"]
     else:
