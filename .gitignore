@@ -30,6 +30,19 @@ benchmark_results.json
 *_results_*.json
 chat.json
 
+# Logs and test output
+*.log
+test_output.txt
+
+# PDFs (documentation, not code)
+*.pdf
+
+# Debug/scratch scripts
+debug_*.py
+
+# Conversation dumps
+FULL_CONVERSATION_SUMMARY.txt
+
 # FX700 SLURM logs
 *.out
 *.err
@@ -38,17 +51,14 @@ slurm-*.out
 # Junk/scratch
 Ignore this Folder/
 
-# ── NOT REQUIRED — exclude from repo ──────────────────────────
-# Documentation (heavy / not needed for running tests)
+# ── Heavy docs (not needed for running tests) ────────────────
 docs/
-fx700_deploy/
 pytket-tenet-doc/
 pytket-tenet-doc.zip
 qarp-v0.4.3-docs/
 qarp-v0.4.3-docs.zip
 
-# Markdown docs (not needed for code to run)
-EXECUTIVE_SUMMARY.md
+# Setup guides (not needed on FX700)
 SUBMISSION_CHECKLIST.md
 FX700_SETUP_AND_TESTING.md
 TEAMMATE_FX700_TESTING_GUIDE.md
