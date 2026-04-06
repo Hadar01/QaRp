@@ -444,6 +444,14 @@ class ProblemEncoder:
                 h[qi] = h.get(qi, 0.0) + lam * D_n * a_i
             offset -= lam * D_n * sum_a   # offset adjustment for the constant part
 
+            # ── Term 3: symmetry-breaking bias ────────────────────────────
+            # Prevents degenerate ground states when demand=capacity/2 for
+            # single-route nodes (h[i] can cancel to zero otherwise).
+            sym_break = lam * 0.01 * D_n
+            for qi, a_i in contribs:
+                h[qi] = h.get(qi, 0.0) + sym_break
+            offset -= sym_break * len(contribs)
+
         return J, h, offset
 
     # ------------------------------------------------------------------
@@ -685,6 +693,7 @@ def greedy_classical_baseline(
         routes_by_dest[dest].sort(key=lambda ir: route_score(ir[1]))
 
     selected: list[tuple[int, Route]] = []   # (qubit_index, Route)
+    actual_flows: dict[int, float] = {}      # qubit_index → actual flow shipped
     delivered: dict[str, float] = {}
 
     # Sort demands by priority descending (serve most important first)
@@ -704,10 +713,13 @@ def greedy_classical_baseline(
             inventory[r.from_node] -= flow
             remaining_demand       -= flow
             delivered[dem.node_id]  = delivered.get(dem.node_id, 0.0) + flow
+            actual_flows[idx]       = actual_flows.get(idx, 0.0) + flow
             if not any(qi == idx for qi, _ in selected):
                 selected.append((idx, r))
 
-    total_cost = sum(r.cost_per_unit * r.capacity for _, r in selected)
+    # Use ACTUAL flow shipped (not full capacity) for fair cost comparison
+    total_cost = sum(r.cost_per_unit * actual_flows.get(idx, r.capacity)
+                     for idx, r in selected)
     total_time = max((r.time_hours for _, r in selected), default=0.0)
 
     if objective == "minimize_cost":

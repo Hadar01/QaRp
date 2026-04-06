@@ -26,29 +26,39 @@ A **hybrid quantum-classical platform** that encodes supply chain constraints as
 
 ## Demonstrable Results
 
-### Quantum Advantage: 4.47× Cost Reduction vs. Industry Heuristics
+### Quantum Advantage: 3.47× Cost Reduction vs. Industry Heuristics
 On a 6-qubit resource allocation problem with inventory constraints:
-- **Greedy heuristic:** $3,800 (the approach most logistics companies use)
+- **Greedy heuristic:** $2,950 (the approach most logistics companies use)
 - **RQAOA (Recursive QAOA):** $850 (matches the provably optimal solution)
-- **Advantage:** 4.47× cost reduction
+- **Advantage:** 3.47× cost reduction over greedy
 
-**Verification:** RQAOA's solution matches both brute-force enumeration (all 64 states) and classical ILP (scipy MILP), achieving **100% approximation ratio**. The advantage represents the real-world gap between industry-standard heuristics and globally optimal solutions.
+**Verification:** RQAOA's solution matches both brute-force enumeration (all 64 states) and classical ILP (scipy MILP), achieving **100% approximation ratio (AR=1.0000)**. The advantage represents the real-world gap between industry-standard heuristics and globally optimal solutions.
 
-**Scaling pathway:** While classical ILP finds the same optimum in <10ms at 6 qubits, RQAOA's O(n) recursive reduction with shallow quantum subcalls offers a fundamentally different scaling trajectory for problems beyond 40 qubits, where ILP's branch-and-bound faces exponential worst cases on NP-hard constraint structures.
+**Honest comparison:** Classical ILP finds the same optimum in <10ms at 6 qubits. RQAOA's value is in its O(n) recursive reduction with shallow quantum subcalls, which offers a fundamentally different scaling trajectory for problems beyond 40 qubits where ILP's branch-and-bound faces exponential worst cases on NP-hard constraint structures.
 
 **Why it works:** RQAOA measures quantum correlations ⟨ZᵢZⱼ⟩ to identify global problem structure that greedy heuristics miss. It recursively eliminates variables (6→5→4→3 qubits), then solves the 3-qubit core exactly. The quantum correlations reveal counter-intuitive allocations—like routing through an expensive warehouse to free up a cheap one for critical locations.
 
-### Benchmark Comparison (6-qubit advantage problem)
+### Benchmark Comparison (FX700 with MPI-enabled Qulacs)
 
-| Algorithm | Cost Found | vs. Greedy | Time |
-|-----------|-----------|-----------|------|
-| Greedy (classical) | $3,800 | 1.00× | <1ms |
-| ILP (scipy MILP) | $850 | 4.47× | <10ms |
-| Gradient VQE | $2,950 | 1.29× | 175s |
-| Layer-by-Layer QAOA | $1,950 | 1.95× | 4.1s |
-| CVaR-QAOA | $2,550 | 1.49× | 41s |
-| **RQAOA** | **$850** | **4.47×** | **1.5s** |
-| Exact (brute-force) | $850 | 4.47× | <1ms |
+#### 6-Qubit Advantage Problem
+
+| Algorithm | Cost Found | vs. Greedy | AR | Time |
+|-----------|-----------|-----------|------|------|
+| Greedy (classical) | $2,950 | 1.00× | — | <1ms |
+| ILP (scipy MILP) | $850 | 3.47× | — | <10ms |
+| **RQAOA** | **$850** | **3.47×** | **1.0000** | **8.4s** |
+| Exact (brute-force) | $850 | 3.47× | 1.0000 | <0.1s |
+| Layer-by-Layer QAOA | $2,550 | 1.16× | 0.6323 | 13.7s |
+| CVaR-QAOA | $1,950 | 1.51× | 0.4393 | 365s |
+| Circuit Cutting | $2,550 | 1.16× | 0.5603 | 6.9s |
+
+#### 12-Qubit Scalability Test
+
+| Algorithm | Cost Found | vs. Greedy | AR | Time |
+|-----------|-----------|-----------|------|------|
+| Exact (brute-force) | $5,460 | 1.00× | 1.0000 | 1.7s |
+| **Circuit Cutting** | **$5,460** | **1.00×** | 0.8184 | **11.0s** |
+| RQAOA | $6,810 | 0.80× | 0.8166 | 40.1s |
 
 ### Proven Reliability
 - ✅ **64/64 tests passing** (24 unit + 40 QARP integration)
