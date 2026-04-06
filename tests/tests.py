@@ -427,19 +427,115 @@ def test_hamiltonian_only_quadratic_interactions():
 
 
 # ===========================================================================
+# Audit Fix Tests
+# ===========================================================================
+
+def test_degeneracy_fix_2q():
+    """
+    After fix: 2q Hamiltonian ground state must be feasible (state 11, both routes).
+    Before fix, h[1]=0 caused degeneracy between 10 (infeasible) and 11 (feasible).
+    """
+    from core.advanced_optimizers import ising_energy
+    enc = ProblemEncoder()
+    ham = enc.encode(NODES, ROUTES, DEMANDS, objective="balanced")
+
+    # Compute energy for both candidate states
+    e10 = ising_energy(ham, [1, 0])   # Only route 0 (STORE-2 unserved -> infeasible)
+    e11 = ising_energy(ham, [1, 1])   # Both routes (all demand met -> feasible)
+
+    # h[1] must be non-zero after the fix (no exact cancellation)
+    assert abs(ham.h.get(1, 0)) > 1e-6, \
+        f"h[1] should be non-zero after degeneracy fix, got {ham.h.get(1, 0)}"
+
+    # State 11 must have strictly lower energy than state 10
+    assert e11 < e10, \
+        f"Feasible state 11 (E={e11:.4f}) must have lower energy than infeasible 10 (E={e10:.4f})"
+
+
+def test_cost_weight_halved():
+    """
+    Default cost_objective_weight should be max(demand_scale, capacity_scale) / 2.0,
+    not the full max(...). This prevents exact cancellation with delivery reward terms.
+    """
+    enc = ProblemEncoder(penalty_weight=10.0)
+
+    # Encode with default cost_objective_weight
+    ham_default = enc.encode(NODES, ROUTES, DEMANDS, objective="balanced")
+
+    # Encode with explicit cost_objective_weight = 10.0 (the old default)
+    ham_old = enc.encode(NODES, ROUTES, DEMANDS, objective="balanced",
+                          constraints={"cost_objective_weight": 10.0})
+
+    # The h coefficients should differ (proving the default has changed)
+    assert ham_default.h != ham_old.h, \
+        "Default cost_objective_weight should now be halved vs the old full-scale default"
+
+
+def test_ilp_finds_optimal_6q():
+    """
+    ILP must find the provably optimal $850 solution on the 6q advantage problem.
+    """
+    import json
+    filepath = os.path.join(os.path.dirname(__file__), '..', 'data', 'request_advantage.json')
+    if not os.path.exists(filepath):
+        return  # Skip if file not available
+
+    from core.advanced_algorithms import parse_supply_chain
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from benchmark_suite import classical_ilp_baseline
+
+    with open(filepath) as f:
+        request = json.load(f)
+    nodes, routes, demands = parse_supply_chain(request)
+
+    result = classical_ilp_baseline(routes, demands, nodes)
+    assert result["optimal"], f"ILP should find optimal, got: {result['status']}"
+    assert abs(result["cost"] - 850.0) < 1.0, \
+        f"ILP should find $850 optimal, got ${result['cost']}"
+
+
+def test_ilp_flow_conservation():
+    """
+    ILP must handle multi-hop networks with distribution centers.
+    Flow conservation: DC outflow - inflow <= inventory.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from benchmark_suite import classical_ilp_baseline
+
+    # Simple multi-hop: WH -> DC -> STORE
+    nodes = [
+        SupplyNode("WH", "Warehouse", "warehouse", 1000, 500),
+        SupplyNode("DC", "Distrib Center", "distribution_center", 800, 100),
+        SupplyNode("ST", "Store", "retail", 500, 10),
+    ]
+    routes = [
+        Route("WH", "DC", 100, 1.0, 1.0, 300),   # R0: WH->DC
+        Route("DC", "ST", 50,  2.0, 0.5, 200),    # R1: DC->ST
+    ]
+    demands = [DemandForecast("ST", 200, priority=3)]
+
+    result = classical_ilp_baseline(routes, demands, nodes)
+    assert result["optimal"], \
+        f"ILP should find feasible solution on multi-hop, got: {result['status']}"
+    # Both routes must be selected (R0 feeds R1 through DC)
+    assert result["bitstring"] == "11", \
+        f"Both WH->DC and DC->ST routes needed, got bitstring {result['bitstring']}"
+
+
+# ===========================================================================
 # Run all tests
 # ===========================================================================
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Quantum Supply Chain — Correctness Tests")
+    print("Quantum Supply Chain - Correctness Tests")
     print("=" * 60)
 
     print("\n[Fix #1] Core module imports")
     run_test("problem_encoder importable",          test_problem_encoder_importable)
     run_test("qaoa_circuit importable",             test_qaoa_circuit_importable)
 
-    print("\n[Fix #3] Binary route decision → flow/allocations/slack")
+    print("\n[Fix #3] Binary route decision -> flow/allocations/slack")
     run_test("flow equals capacity when selected",  test_decoder_flow_is_capacity_when_selected)
     run_test("allocations outflow/inflow correct",  test_decoder_allocations_outflow_inflow)
     run_test("slack negative when demand unmet",    test_decoder_demand_slack_negative_when_unmet)
@@ -448,17 +544,17 @@ if __name__ == "__main__":
     run_test("objective_value differs by objective",  test_objective_value_differs_across_objectives)
     run_test("minimize_cost == total monetary cost",  test_objective_value_minimize_cost_is_total_cost)
     run_test("minimize_time == max time_hours",       test_objective_value_minimize_time_is_max_time)
-    run_test("empty selection → zero objective",      test_objective_value_empty_selection)
+    run_test("empty selection -> zero objective",      test_objective_value_empty_selection)
 
     print("\n[Fix #5] Penalty scaling")
-    run_test("high penalty scale → larger coefficients", test_penalty_scale_affects_hamiltonian_coefficients)
+    run_test("high penalty scale -> larger coefficients", test_penalty_scale_affects_hamiltonian_coefficients)
     run_test("all three penalty key names accepted",     test_penalty_scale_constraint_key_names)
     run_test("penalty floor prevents zero penalties",    test_penalty_always_positive_floor)
 
-    print("\n[Fix #6] Route↔qubit mapping transparency")
+    print("\n[Fix #6] Route<->qubit mapping transparency")
     run_test("qubit_map is deterministic",               test_qubit_map_is_deterministic)
     run_test("qubit_map[i] is routes[i]",                test_qubit_map_index_matches_routes_list)
-    run_test("route_ids format is FROM→TO#i",            test_route_ids_format)
+    run_test("route_ids format is FROM->TO#i",            test_route_ids_format)
     run_test("route_assignments carry qubit_index",      test_decoder_route_assignments_carry_qubit_index)
 
     print("\n[Fix #7] Greedy classical baseline")
@@ -473,8 +569,15 @@ if __name__ == "__main__":
     print("\n[Fix #1] QUBO quadratic constraint")
     run_test("no cubic J terms in Hamiltonian",          test_hamiltonian_only_quadratic_interactions)
 
+    print("\n[Audit Fix] Degeneracy & ILP baseline")
+    run_test("2q degeneracy fix - ground state feasible", test_degeneracy_fix_2q)
+    run_test("cost_objective_weight is halved",           test_cost_weight_halved)
+    run_test("ILP finds optimal $850 on 6q advantage",    test_ilp_finds_optimal_6q)
+    run_test("ILP handles multi-hop flow conservation",   test_ilp_flow_conservation)
+
     print(f"\n{'='*60}")
     total = _PASS + _FAIL
     print(f"Results: {_PASS}/{total} passed, {_FAIL} failed")
     if _FAIL:
         sys.exit(1)
+

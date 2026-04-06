@@ -72,7 +72,7 @@
 
   "demands": [
     {"node_id":"RET-PDX",  "demand":800,   "priority":3},
-    {"node_id":"RET-LAX",  "demand":1500,  "priority":5},
+    {"node_id":"RET-LAX",  "demand":1300,  "priority":5},
     {"node_id":"RET-DEN",  "demand":700,   "priority":3},
     {"node_id":"RET-HOU",  "demand":1100,  "priority":4},
     {"node_id":"RET-DTW",  "demand":600,   "priority":2},

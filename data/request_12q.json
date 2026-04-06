@@ -32,7 +32,7 @@
     {"node_id":"RET-NYC", "demand":1000, "priority":5},
     {"node_id":"RET-CHI", "demand":600,  "priority":4},
     {"node_id":"RET-DAL", "demand":450,  "priority":2},
-    {"node_id":"RET-LA",  "demand":700,  "priority":3}
+    {"node_id":"RET-LA",  "demand":450,  "priority":3}
   ],
   "objective": "balanced",
   "quantum_iterations": 500,

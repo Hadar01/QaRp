@@ -214,7 +214,7 @@ class ProblemEncoder:
         # solutions negligibly small.  cost_objective_weight scales up the
         # objective relative to penalties so QAOA can actually resolve it.
         cost_objective_weight = float(constraints.get("cost_objective_weight",
-                                                       max(demand_scale, capacity_scale)))
+                                                       max(demand_scale, capacity_scale) / 2.0))
         norm_costs = [c * cost_objective_weight for c in norm_costs]
 
         # ── Step 4: QUBO → Ising conversion for linear cost terms ─────────

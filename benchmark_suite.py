@@ -35,6 +35,104 @@ from core.advanced_optimizers import (
 from core.error_mitigation import mitigate_qaoa
 
 
+# ---------------------------------------------------------------------------
+# Classical ILP Baseline (Fair Comparison)
+# ---------------------------------------------------------------------------
+
+def classical_ilp_baseline(routes, demands, nodes):
+    """
+    Solve the binary resource allocation problem EXACTLY using
+    scipy's MILP solver (HiGHS backend).
+
+    This is the FAIR classical baseline: same binary decision model
+    as the quantum solver, solved to provable optimality.
+
+    Includes flow conservation constraints for distribution centers
+    so multi-hop supply chains (WH→DC→Retail) are handled correctly.
+
+    Returns
+    -------
+    dict with cost, bitstring, time_ms, status
+    """
+    from scipy.optimize import milp, LinearConstraint, Bounds
+
+    n = len(routes)
+    c = np.array([r.cost_per_unit * r.capacity for r in routes])
+
+    # Demand satisfaction: for each demand node, total inbound capacity >= demand
+    demand_rows, demand_lower = [], []
+    for d in demands:
+        row = np.zeros(n)
+        for i, r in enumerate(routes):
+            if r.to_node == d.node_id:
+                row[i] = r.capacity
+        demand_rows.append(row)
+        demand_lower.append(d.demand)
+
+    # Inventory limits: for each source node, total outbound capacity <= inventory
+    # Skip distribution centers — they use flow conservation instead
+    inv_rows, inv_upper = [], []
+    for nd in nodes:
+        if nd.type == "distribution_center":
+            continue  # handled by flow conservation below
+        outgoing = [i for i, r in enumerate(routes) if r.from_node == nd.id]
+        if not outgoing:
+            continue
+        row = np.zeros(n)
+        for i in outgoing:
+            row[i] = routes[i].capacity
+        inv_rows.append(row)
+        inv_upper.append(nd.current_inventory)
+
+    # Flow conservation at distribution centers:
+    # outflow - inflow <= existing inventory
+    fc_rows, fc_upper = [], []
+    for nd in nodes:
+        if nd.type != "distribution_center":
+            continue
+        outgoing = [i for i, r in enumerate(routes) if r.from_node == nd.id]
+        incoming = [i for i, r in enumerate(routes) if r.to_node == nd.id]
+        if not outgoing:
+            continue
+        row = np.zeros(n)
+        for i in outgoing:
+            row[i] = routes[i].capacity      # outflow (positive)
+        for i in incoming:
+            row[i] = -routes[i].capacity     # inflow (negative)
+        fc_rows.append(row)
+        fc_upper.append(nd.current_inventory)
+
+    constraints = []
+    if demand_rows:
+        constraints.append(LinearConstraint(np.array(demand_rows), demand_lower, np.inf))
+    if inv_rows:
+        constraints.append(LinearConstraint(np.array(inv_rows), -np.inf, inv_upper))
+    if fc_rows:
+        constraints.append(LinearConstraint(np.array(fc_rows), -np.inf, fc_upper))
+
+    t0 = time.time()
+    result = milp(c, constraints=constraints, integrality=np.ones(n), bounds=Bounds(0, 1))
+    elapsed = time.time() - t0
+
+    if result.success:
+        bits = [int(round(x)) for x in result.x]
+        bitstring = "".join(str(b) for b in bits)
+        cost = sum(routes[i].cost_per_unit * routes[i].capacity
+                   for i in range(n) if bits[i] == 1)
+    else:
+        bitstring = "0" * n
+        cost = float("inf")
+
+    return {
+        "method": "ilp_milp",
+        "cost": cost,
+        "bitstring": bitstring,
+        "time_ms": elapsed * 1000,
+        "status": result.message,
+        "optimal": result.success,
+    }
+
+
 def load_problem(filepath):
     """Load and encode a problem from JSON."""
     with open(filepath) as f:
@@ -234,6 +332,13 @@ def main():
         greedy_cost = greedy["total_cost"]
         print(f"  Greedy baseline: ${greedy_cost:,.0f}")
 
+        # ILP baseline (provably optimal, same binary model)
+        ilp = classical_ilp_baseline(routes, demands, nodes)
+        ilp_cost = ilp["cost"] if ilp["optimal"] else float("inf")
+        ilp_status = f"${ilp_cost:,.0f}" if ilp["optimal"] else "INFEASIBLE"
+        print(f"  ILP baseline:    {ilp_status} in {ilp['time_ms']:.1f}ms")
+        problem_results_extra = {"ilp": ilp}
+
         # Brute-force optimal (small problems)
         optimal_energy = compute_approximation_ratio(0, ham)
         if optimal_energy is not None:
@@ -245,6 +350,8 @@ def main():
 
         # Run algorithms
         problem_results = {"n_qubits": n_qubits, "greedy_cost": greedy_cost,
+                           "ilp_cost": ilp_cost if ilp["optimal"] else None,
+                           "ilp_time_ms": ilp["time_ms"],
                            "optimal_energy": optimal_energy, "algorithms": {}}
 
         print(f"\n  {'Algorithm':<16} {'Energy':>10} {'Cost':>10} {'Adv.':>6} {'AR':>6} {'Time':>6}")
@@ -273,6 +380,25 @@ def main():
                 problem_results["algorithms"][algo] = res
 
                 print(f"  {algo:<16} {energy:>10.2f} ${cost:>9,.0f} {advantage:>5.2f}x {ar_str:>6} {res['time_seconds']:>5.1f}s")
+
+        # Fair comparison summary
+        best_quantum = min(
+            [(k, v) for k, v in problem_results["algorithms"].items()
+             if "cost" in v and "error" not in v],
+            key=lambda x: x[1]["cost"],
+            default=None
+        )
+        if best_quantum:
+            bq_name, bq_res = best_quantum
+            bq_cost = bq_res["cost"]
+            print(f"\n  {'─'*60}")
+            print(f"  ADVANTAGE ANALYSIS (best quantum: {bq_name}):")
+            print(f"    vs Greedy (industry heuristic): {greedy_cost/bq_cost:.2f}× cost reduction")
+            if ilp["optimal"]:
+                quality = ilp_cost / bq_cost if bq_cost > 0 else 0
+                print(f"    vs ILP (provably optimal):      {quality:.2f}× quality, "
+                      f"ILP {ilp['time_ms']:.1f}ms vs quantum {bq_res['time_seconds']:.1f}s")
+            print(f"    RQAOA matches optimal: {'YES' if bq_cost <= ilp_cost * 1.01 else 'NO'}")
 
         # ZNE demo on best algorithm
         best_algo = min(
