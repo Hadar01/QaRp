@@ -405,12 +405,12 @@ def main():
         if best_quantum:
             bq_name, bq_res = best_quantum
             bq_cost = bq_res["cost"]
-            print(f"\n  {'─'*60}")
+            print(f"\n  {'-'*60}")
             print(f"  ADVANTAGE ANALYSIS (best quantum: {bq_name}):")
-            print(f"    vs Greedy (industry heuristic): {greedy_cost/bq_cost:.2f}× cost reduction")
+            print(f"    vs Greedy (industry heuristic): {greedy_cost/bq_cost:.2f}x cost reduction")
             if ilp["optimal"]:
                 quality = ilp_cost / bq_cost if bq_cost > 0 else 0
-                print(f"    vs ILP (provably optimal):      {quality:.2f}× quality, "
+                print(f"    vs ILP (provably optimal):      {quality:.2f}x quality, "
                       f"ILP {ilp['time_ms']:.1f}ms vs quantum {bq_res['time_seconds']:.1f}s")
             print(f"    RQAOA matches optimal: {'YES' if bq_cost <= ilp_cost * 1.01 else 'NO'}")
 

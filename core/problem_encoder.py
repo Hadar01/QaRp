@@ -444,13 +444,15 @@ class ProblemEncoder:
                 h[qi] = h.get(qi, 0.0) + lam * D_n * a_i
             offset -= lam * D_n * sum_a   # offset adjustment for the constant part
 
-            # ── Term 3: symmetry-breaking bias ────────────────────────────
-            # Prevents degenerate ground states when demand=capacity/2 for
-            # single-route nodes (h[i] can cancel to zero otherwise).
+            # ── Term 3: symmetry-breaking bias (conditional) ────────────────
+            # Only applied when h[qi] is near-zero after Term 2, which
+            # indicates the degeneracy case (demand=capacity/2, single route).
+            # This avoids distorting the landscape for non-degenerate problems.
             sym_break = lam * 0.01 * D_n
             for qi, a_i in contribs:
-                h[qi] = h.get(qi, 0.0) + sym_break
-            offset -= sym_break * len(contribs)
+                if abs(h.get(qi, 0.0)) < 1e-6:
+                    h[qi] = h.get(qi, 0.0) + sym_break
+                    offset -= sym_break
 
         return J, h, offset
 
