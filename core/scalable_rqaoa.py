@@ -134,15 +134,15 @@ class ScalableRQAOA:
     the critical subproblem where it matters most.
     """
 
-    EXACT_THRESHOLD = 20  # Switch to exact RQAOA below this
+    EXACT_THRESHOLD = 14  # Switch to exact RQAOA below this
 
     def __init__(
         self,
         hamiltonian: IsingHamiltonian,
         qaoa_p: int = 1,
         threshold: int = 3,
-        qaoa_restarts: int = 3,
-        qaoa_max_iter: int = 100,
+        qaoa_restarts: int = 2,
+        qaoa_max_iter: int = 80,
         n_shots: int = 4096,
         use_quantum_above: int = 0,  # Use quantum (sampling) above this size
     ):
