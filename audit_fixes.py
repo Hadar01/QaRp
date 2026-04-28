@@ -332,7 +332,7 @@ def fair_benchmark(filepath):
     print(f"  RQAOA:              ${rqaoa_cost:,.0f} in {rqaoa_time:.1f} ms")
 
     # Summary
-    print(f"\n  {'─'*60}")
+    print(f"\n  {'-'*60}")
     print(f"  ADVANTAGE ANALYSIS:")
     if ilp["optimal"]:
         ilp_cost = ilp["cost"]
@@ -343,7 +343,7 @@ def fair_benchmark(filepath):
               f"quality={sa_cost/rqaoa_cost:.2f}x, "
               f"speed={rqaoa_time/sa['time_ms']:.1f}x {'slower' if rqaoa_time > sa['time_ms'] else 'faster'}")
         print(f"    RQAOA vs Greedy (original claim):   "
-              f"quality={greedy['total_cost']/rqaoa_cost:.2f}x  ← vs industry heuristic")
+              f"quality={greedy['total_cost']/rqaoa_cost:.2f}x  <- vs industry heuristic")
         print(f"    RQAOA vs Greedy (corrected):        "
               f"quality={corrected['actual_flow_cost']/rqaoa_cost:.2f}x")
 
@@ -369,7 +369,7 @@ def scaling_experiment():
     ]
 
     print(f"\n  {'Size':>5} {'ILP (ms)':>10} {'SA (ms)':>10} {'RQAOA (ms)':>12} {'ILP cost':>10} {'RQAOA cost':>12}")
-    print(f"  {'─'*5} {'─'*10} {'─'*10} {'─'*12} {'─'*10} {'─'*12}")
+    print(f"  {'-'*5} {'-'*10} {'-'*10} {'-'*12} {'-'*10} {'-'*12}")
 
     for filepath, label in files:
         if not os.path.exists(filepath):
