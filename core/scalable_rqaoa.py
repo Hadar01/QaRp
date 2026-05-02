@@ -92,26 +92,52 @@ def _classical_correlation_estimation(ham: IsingHamiltonian) -> tuple[dict, dict
     """
     Estimate correlations from Hamiltonian structure (classical heuristic).
 
-    Uses the sign and magnitude of J couplings to infer which variables
-    should be correlated/anti-correlated. This is used for the first few
-    reduction steps on very large problems (> statevector limit) when
-    circuit cutting is too slow.
+    Uses the ACTUAL MAGNITUDE of h and J coefficients to determine
+    which variables to fix and how strongly they're correlated.
+    Stronger coefficients get higher weight in the reduction decision.
     """
     n = ham.n_qubits
     single = {}
     pair = {}
 
-    # Strong negative h[i] suggests qubit i should be in |1⟩ (spin -1)
+    # Use actual h values (magnitude AND sign matter)
     for i, val in ham.h.items():
-        single[i] = 1.0 if val > 0 else -1.0
+        single[i] = val  # positive h → spin +1 preferred, negative → spin -1
 
-    # Strong J couplings indicate correlation structure
+    # Use actual J values (magnitude AND sign matter)
     for (i, j), val in ham.J.items():
-        # J > 0 → spins want to be SAME → correlated
-        # J < 0 → spins want to be OPPOSITE → anti-correlated
-        pair[(min(i, j), max(i, j))] = 1.0 if val > 0 else -1.0
+        key = (min(i, j), max(i, j))
+        # Accumulate if multiple terms exist for same pair
+        pair[key] = pair.get(key, 0.0) + val
 
     return single, pair
+
+
+def _local_search(ham: IsingHamiltonian, bits: list, max_rounds: int = 50) -> list:
+    """
+    Greedy local search: repeatedly flip the bit that most improves energy.
+
+    Standard post-processing for quantum/heuristic optimization.
+    Terminates when no single bit-flip improves energy.
+    """
+    n = ham.n_qubits
+    current_bits = list(bits)
+    current_energy = ising_energy(ham, current_bits)
+
+    for _ in range(max_rounds):
+        improved = False
+        for i in range(n):
+            current_bits[i] ^= 1
+            new_energy = ising_energy(ham, current_bits)
+            if new_energy < current_energy - 1e-10:
+                current_energy = new_energy
+                improved = True
+            else:
+                current_bits[i] ^= 1  # revert
+        if not improved:
+            break
+
+    return current_bits
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -260,8 +286,20 @@ class ScalableRQAOA:
         bits = []
         for i in range(n_original):
             bits.append(0 if spins.get(i, 1) == 1 else 1)
-        bitstring = "".join(str(b) for b in bits)
 
+        # ── Phase 4: Local search refinement ─────────────────────────────
+        # Greedy bit-flip improvement — standard post-processing for
+        # quantum optimization to polish the heuristic solution.
+        pre_energy = ising_energy(self.original_ham, bits)
+        bits = _local_search(self.original_ham, bits, max_rounds=100)
+        post_energy = ising_energy(self.original_ham, bits)
+        if post_energy < pre_energy - 1e-10:
+            reduction_log.append(
+                f"  [local_search] Energy {pre_energy:.2f} → {post_energy:.2f} "
+                f"(improved {pre_energy - post_energy:.2f})"
+            )
+
+        bitstring = "".join(str(b) for b in bits)
         final_energy = ising_energy(self.original_ham, bits)
         elapsed = time.time() - t0
 
