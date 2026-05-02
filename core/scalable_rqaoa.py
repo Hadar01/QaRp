@@ -123,32 +123,30 @@ class ScalableRQAOA:
     Scalable Recursive QAOA for 36+ qubit supply chain optimization.
 
     Strategy:
-    - Phase 1 (n > EXACT_THRESHOLD): Use classical correlation heuristics
-      or sampling-based QAOA to estimate correlations and reduce variables.
-    - Phase 2 (n ≤ EXACT_THRESHOLD): Switch to exact statevector RQAOA
-      for provably correct final reductions.
-    - Phase 3 (n ≤ threshold): Exact brute-force solve.
+    - Phase 1 (n > SOLVE_THRESHOLD): Use classical correlation heuristics
+      to estimate correlations and reduce variables — O(n) per step, instant.
+    - Phase 2 (n ≤ SOLVE_THRESHOLD): Brute-force exact solve on the
+      reduced subproblem (2^16 = 65K states, ~1 second).
 
-    This hybrid approach enables RQAOA on problems that are too large
-    for statevector simulation while maintaining quantum advantage on
-    the critical subproblem where it matters most.
+    This hybrid approach enables RQAOA-style recursive reduction on
+    problems far beyond statevector limits while completing in seconds.
     """
 
-    EXACT_THRESHOLD = 14  # Switch to exact RQAOA below this
+    SOLVE_THRESHOLD = 16  # Brute-force solve below this (2^16 = 65K states)
 
     def __init__(
         self,
         hamiltonian: IsingHamiltonian,
         qaoa_p: int = 1,
-        threshold: int = 3,
+        threshold: int = 16,
         qaoa_restarts: int = 2,
         qaoa_max_iter: int = 80,
         n_shots: int = 4096,
-        use_quantum_above: int = 0,  # Use quantum (sampling) above this size
+        use_quantum_above: int = 0,
     ):
         self.original_ham = hamiltonian
         self.qaoa_p = qaoa_p
-        self.threshold = min(threshold, hamiltonian.n_qubits)
+        self.threshold = min(max(threshold, 3), hamiltonian.n_qubits)
         self.qaoa_restarts = qaoa_restarts
         self.qaoa_max_iter = qaoa_max_iter
         self.n_shots = n_shots
@@ -167,50 +165,24 @@ class ScalableRQAOA:
         substitutions = []
         reduction_log = []
         total_evals = 0
-        phase_transitions = []
 
-        # ── Phase 1: Large-scale reduction (n > EXACT_THRESHOLD) ─────────
-        while len(active) > max(self.EXACT_THRESHOLD, self.threshold):
+        solve_at = min(self.SOLVE_THRESHOLD, self.threshold)
+
+        # ── Phase 1: Recursive reduction via correlation heuristics ───────
+        # Reduces 36→16 (or whatever solve_at is) using O(n) classical
+        # correlation estimation at each step. Each step is instant.
+        while len(active) > solve_at:
             n_active = len(active)
             compact_ham = _build_compact_hamiltonian(h, J, offset, active)
 
-            # Determine correlation method based on problem size
-            if n_active <= self.EXACT_THRESHOLD:
-                # Small enough for exact statevector
-                method = "exact_statevector"
-                p_use = min(self.qaoa_p, max(1, n_active - 1))
-                qaoa = QAOACircuit(compact_ham, p_layers=p_use)
-                vqe = VQEOptimizer(
-                    qaoa, max_iterations=self.qaoa_max_iter,
-                    n_restarts=self.qaoa_restarts,
-                )
-                res = vqe.optimize()
-                total_evals += res["n_evaluations"]
-                from core.advanced_optimizers import _compute_correlations
-                single, pair = _compute_correlations(qaoa, res["best_params"])
-            elif n_active <= 28 and self.use_quantum_above <= n_active:
-                # Medium: use sampling-based QAOA correlations
-                method = "sampling_qaoa"
-                p_use = 1  # Shallow circuit for speed
-                qaoa = QAOACircuit(compact_ham, p_layers=p_use)
-                vqe = VQEOptimizer(
-                    qaoa, max_iterations=min(50, self.qaoa_max_iter),
-                    n_restarts=2,
-                )
-                res = vqe.optimize()
-                total_evals += res["n_evaluations"]
-                single, pair = _estimate_correlations_sampling(
-                    compact_ham, res["best_params"], qaoa, self.n_shots
-                )
-            else:
-                # Large: use classical correlation heuristics
-                method = "classical_heuristic"
-                single, pair = _classical_correlation_estimation(compact_ham)
+            # Use classical correlation heuristics (instant, no VQE)
+            method = "classical_heuristic"
+            single, pair = _classical_correlation_estimation(compact_ham)
 
             # Map compact indices → original indices
             idx_to_orig = {ci: active[ci] for ci in range(n_active)}
 
-            # Find strongest signal
+            # Find strongest correlation signal
             best_strength = -1.0
             best_action = None
 
@@ -229,7 +201,6 @@ class ScalableRQAOA:
                     best_action = ("pair", orig_j, orig_i, sign)
 
             if best_action is None:
-                # No signal — just eliminate the last active qubit
                 best_action = ("single", active[-1], 1)
 
             # Apply reduction
@@ -257,44 +228,24 @@ class ScalableRQAOA:
 
             logger.debug(reduction_log[-1])
 
-        # ── Phase 2: Exact RQAOA on remaining qubits (≤ 20) ─────────────
-        if len(active) > self.threshold:
-            phase_transitions.append(
-                f"Phase 2: Exact RQAOA on {len(active)} qubits"
-            )
-            compact_ham = _build_compact_hamiltonian(h, J, offset, active)
+        # ── Phase 2: Exact brute-force solve on reduced problem ──────────
+        # At ≤16 qubits, enumerate all 2^n states (≤65K, instant)
+        compact_ham = _build_compact_hamiltonian(h, J, offset, active)
+        n_remaining = len(active)
 
-            # Use standard RQAOA for the remaining small problem
-            rqaoa = RecursiveQAOA(
-                compact_ham,
-                qaoa_p=min(2, self.qaoa_p + 1),
-                threshold=self.threshold,
-                qaoa_restarts=self.qaoa_restarts,
-                qaoa_max_iter=self.qaoa_max_iter,
-            )
-            rqaoa_result = rqaoa.optimize()
-            total_evals += rqaoa_result["n_evaluations"]
+        exact_solver = ExactGroundStateOptimizer(compact_ham)
+        exact_result = exact_solver.optimize()
+        total_evals += exact_result["n_evaluations"]
 
-            # Map compact solution back to active qubit indices
-            compact_bits = [int(b) for b in rqaoa_result["best_bitstring"]]
-            spins = {}
-            for ci, orig_q in enumerate(active):
-                spins[orig_q] = 1 - 2 * compact_bits[ci]
+        compact_bits = [int(b) for b in exact_result["best_bitstring"]]
+        spins = {}
+        for ci, orig_q in enumerate(active):
+            spins[orig_q] = 1 - 2 * compact_bits[ci]
 
-            reduction_log.extend([
-                f"  [exact_rqaoa] {len(active)}→{rqaoa_result.get('final_n_qubits', self.threshold)} "
-                f"qubits via {rqaoa_result.get('n_reductions', 0)} reductions"
-            ])
-        else:
-            # Already small enough — solve exactly
-            compact_ham = _build_compact_hamiltonian(h, J, offset, active)
-            exact_solver = ExactGroundStateOptimizer(compact_ham)
-            exact_result = exact_solver.optimize()
-            total_evals += exact_result["n_evaluations"]
-            compact_bits = [int(b) for b in exact_result["best_bitstring"]]
-            spins = {}
-            for ci, orig_q in enumerate(active):
-                spins[orig_q] = 1 - 2 * compact_bits[ci]
+        reduction_log.append(
+            f"  [exact_solve] Brute-force on {n_remaining} qubits "
+            f"({2**n_remaining} states)"
+        )
 
         # ── Phase 3: Back-substitute all fixed variables ─────────────────
         for sub in reversed(substitutions):
@@ -314,7 +265,7 @@ class ScalableRQAOA:
         final_energy = ising_energy(self.original_ham, bits)
         elapsed = time.time() - t0
 
-        n_phase1 = sum(1 for s in substitutions)
+        n_reductions = len(substitutions)
         return {
             "best_params": np.zeros(2),
             "best_energy": float(final_energy),
@@ -324,12 +275,12 @@ class ScalableRQAOA:
             "n_restarts": 1,
             "history": [float(final_energy)],
             "optimizer_msg": (
-                f"ScalableRQAOA: {n_original}→{self.threshold} qubits, "
-                f"{n_phase1} total reductions, {elapsed:.1f}s"
+                f"ScalableRQAOA: {n_original}→{n_remaining} qubits, "
+                f"{n_reductions} reductions, {elapsed:.1f}s"
             ),
             "method": "scalable_rqaoa",
             "reduction_log": reduction_log,
-            "n_reductions": n_phase1,
-            "final_n_qubits": self.threshold,
+            "n_reductions": n_reductions,
+            "final_n_qubits": n_remaining,
             "time_seconds": round(elapsed, 2),
         }
