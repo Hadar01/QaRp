@@ -321,7 +321,7 @@ cd ~/QARPdemo/QaRp && source ~/QARPdemo/venv/bin/activate
 mpirun -np 1 python tests/tests.py
 mpirun -np 1 python benchmark_suite.py -i data/request_advantage.json -a exact,rqaoa,scalable_rqaoa
 mpirun -np 1 python benchmark_suite.py -i data/request_36q.json data/request_64q.json -a scalable_rqaoa
-```
+```huuh
 
 ## Appendix B: Repository Structure
 
