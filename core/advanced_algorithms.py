@@ -84,7 +84,10 @@ class WarmStartQAOA:
 
     def _energy(self, bits: np.ndarray) -> float:
         spins = 1 - 2 * bits
-        return float(self.h_arr @ spins + spins @ self.J_mat @ spins)
+        energy = float(self.h_arr @ spins)
+        for (qi, qj), J_val in self.ham.J.items():
+            energy += J_val * spins[qi] * spins[qj]
+        return energy + self.ham.offset
 
     def _cvar_energy(self, energies: List[float]) -> float:
         sorted_e = sorted(energies)
