@@ -40,7 +40,7 @@ from core.error_mitigation import mitigate_qaoa
 # Classical ILP Baseline (Fair Comparison)
 # ---------------------------------------------------------------------------
 
-def classical_ilp_baseline(routes, demands, nodes):
+def classical_ilp_baseline(routes, demands, nodes, time_limit_seconds=None):
     """
     Solve the binary resource allocation problem EXACTLY using
     scipy's MILP solver (HiGHS backend).
@@ -49,11 +49,18 @@ def classical_ilp_baseline(routes, demands, nodes):
     as the quantum solver, solved to provable optimality.
 
     Includes flow conservation constraints for distribution centers
-    so multi-hop supply chains (WH→DC→Retail) are handled correctly.
+    so multi-hop supply chains (WH->DC->Retail) are handled correctly.
+
+    Parameters
+    ----------
+    time_limit_seconds : float or None
+        If set, HiGHS will terminate after this many seconds and return
+        the best solution found so far (or report no solution). Useful
+        for scaling experiments where exact ILP becomes intractable.
 
     Returns
     -------
-    dict with cost, bitstring, time_ms, status
+    dict with cost, bitstring, time_ms, status, optimal, timed_out
     """
     from scipy.optimize import milp, LinearConstraint, Bounds
 
@@ -111,11 +118,27 @@ def classical_ilp_baseline(routes, demands, nodes):
     if fc_rows:
         constraints.append(LinearConstraint(np.array(fc_rows), -np.inf, fc_upper))
 
+    options = {}
+    if time_limit_seconds is not None:
+        options["time_limit"] = float(time_limit_seconds)
+
     t0 = time.time()
-    result = milp(c, constraints=constraints, integrality=np.ones(n), bounds=Bounds(0, 1))
+    result = milp(
+        c,
+        constraints=constraints,
+        integrality=np.ones(n),
+        bounds=Bounds(0, 1),
+        options=options or None,
+    )
     elapsed = time.time() - t0
 
-    if result.success:
+    timed_out = (
+        time_limit_seconds is not None
+        and elapsed >= time_limit_seconds * 0.95
+        and not result.success
+    )
+
+    if result.success and result.x is not None:
         bits = [int(round(x)) for x in result.x]
         bitstring = "".join(str(b) for b in bits)
         cost = sum(routes[i].cost_per_unit * routes[i].capacity
@@ -131,6 +154,7 @@ def classical_ilp_baseline(routes, demands, nodes):
         "time_ms": elapsed * 1000,
         "status": result.message,
         "optimal": result.success,
+        "timed_out": timed_out,
     }
 
 
@@ -257,8 +281,8 @@ def run_algorithm(name, ham, nodes, routes, demands, p=3, shots=1024, max_iter=3
 
         elif name == "scalable_rqaoa":
             srqaoa = ScalableRQAOA(
-                ham, qaoa_p=min(2, p), threshold=min(3, ham.n_qubits),
-                qaoa_restarts=3, qaoa_max_iter=100,
+                ham, qaoa_p=min(2, p), threshold=16,
+                qaoa_restarts=2, qaoa_max_iter=80,
             )
             res = srqaoa.optimize()
             result = {"energy": res["best_energy"], "bitstring": res["best_bitstring"],
@@ -284,11 +308,10 @@ def compute_cost(bitstring, routes):
     return total
 
 
-def compute_approximation_ratio(energy, ham):
+def compute_optimal_energy(energy, ham):
     """
-    Compute approximation ratio: E_quantum / E_optimal.
-
-    For small problems (≤20 qubits), brute-force the optimal solution.
+    Compute exact ground state energy via brute-force for small problems (<=20 qubits).
+    Returns the optimal (minimum) energy, or None if too large.
     """
     n = ham.n_qubits
     if n > 20:
@@ -354,7 +377,7 @@ def main():
         problem_results_extra = {"ilp": ilp}
 
         # Brute-force optimal (small problems)
-        optimal_energy = compute_approximation_ratio(0, ham)
+        optimal_energy = compute_optimal_energy(0, ham)
         if optimal_energy is not None:
             print(f"  Optimal energy (brute-force): {optimal_energy:.4f}")
 

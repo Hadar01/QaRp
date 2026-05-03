@@ -27,5 +27,5 @@
         "demand_penalty_scale": 15.0,
         "capacity_penalty_scale": 15.0
     },
-    "_design": "6-qubit resource allocation trap: WH-A has 250 inventory, supplies all 3 stores at $1/unit but can only cover 2 of 3 (250 out of 450 needed). Greedy picks R0(WH-A>S1,$200) first by priority, depleting WH-A to 50, forcing S2+S3 onto expensive WH-B routes: $200+$2250+$1200=$3650+. Optimal: R1(WH-B>S1,$600)+R2(WH-A>S2,$150)+R4(WH-A>S3,$100) = $850 with WH-A=250/250. Quantum advantage: 4.47x."
+    "_design": "6-qubit resource allocation trap: WH-A has 250 inventory, supplies all 3 stores at $1/unit but can only cover 2 of 3 (250 out of 450 needed). Greedy picks R0(WH-A>S1,$200) first by priority, depleting WH-A to 50, forcing S2+S3 onto expensive WH-B routes: $200+$2250+$1200=$3650+. Optimal: R1(WH-B>S1,$600)+R2(WH-A>S2,$150)+R4(WH-A>S3,$100) = $850 with WH-A=250/250. Quantum advantage vs greedy: 3.47x."
 }
