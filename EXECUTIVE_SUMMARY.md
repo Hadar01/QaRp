@@ -36,16 +36,17 @@ making the comparison apples-to-apples.
 | Size | Routes | ILP cost   | ILP time | Best Quantum  | Method     | Time   | ILP status |
 |------|-------:|-----------:|---------:|---------------|------------|-------:|------------|
 | 2q   |  2     | $1,650     |   8 ms   | $1,650 (1.00) | RQAOA      | ~0.1 s | optimal    |
-| 6q   |  6     | $850       |   8 ms   | $850 (1.00)   | RQAOA      | ~9 s   | optimal    |
+| 6q   |  6     | $850       |  10 ms   | $850 (1.00)   | RQAOA      | ~9 s   | optimal    |
+| 6q   |  6     | $850       |  10 ms   | $850 (1.00)   | ScalableRQAOA | ~0.1 s | optimal |
 | 12q  | 12     | $15,140    |   6 ms   | $8,340 (1.00) | RQAOA      | ~40 s  | optimal    |
-| 36q  | 36     | $28,410    |  25 ms   | scalable      | ScalableRQAOA | ~0.2 s | optimal |
-| 62q  | 62     | $319,100   |  54 ms   | scalable      | ScalableRQAOA | ~0.8 s | optimal |
+| 36q  | 36     | $28,410    |  25 ms   | $10,810       | ScalableRQAOA | ~38 s | optimal |
+| 62q  | 62     | $319,100   |  35 ms   | $269,850      | ScalableRQAOA | ~24 s | optimal |
 
-_FX700 results from qulacs backend.  AR in parentheses = approximation ratio.
-RQAOA achieves AR=1.0000 (provably optimal) at 2q, 6q, and 12q.
-ScalableRQAOA uses hybrid classical-quantum reduction for problems beyond
-statevector simulation limits._
-_Reproduce with `python benchmark_suite.py -i data/request_advantage.json -a exact,rqaoa`._
+_All results from Fujitsu FX700 with qulacs backend (MPI-enabled)._
+_AR in parentheses = approximation ratio (1.00 = provably optimal match)._
+_RQAOA achieves AR=1.0000 at 2q, 6q, and 12q._
+_ScalableRQAOA also achieves AR=1.0000 at 6q, and scales to 62 qubits._
+_Reproduce with `python benchmark_suite.py -i data/request_advantage.json -a exact,rqaoa,scalable_rqaoa`._
 
 **What this shows.** At hackathon-scale problem sizes, HiGHS MILP is
 engineered for exactly this regime and remains the right tool for production
