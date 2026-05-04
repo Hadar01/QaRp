@@ -44,7 +44,7 @@ We present an extensively benchmarked quantum-classical pipeline for multi-echel
 
 Our approach encodes inventory-constrained supply networks — including flow conservation at distribution centers — as an Ising Hamiltonian with provably quadratic penalty terms, then applies RQAOA's correlation-based recursive variable elimination to find optimal solutions. On the FX700 with MPI-enabled Qulacs via QARP, RQAOA achieves an approximation ratio (AR) of 1.0000 (provably optimal) at 6 qubits, matching the HiGHS MILP solver exactly. The 36-qubit solution is independently verified via pytket-tenet's MPS (Matrix Product State) backend with bond dimension χ=64 — demonstrating Fujitsu's tensor network simulator on a real combinatorial optimization problem for the first time.
 
-Among 12 quantum algorithm variants benchmarked, **RQAOA emerges as the clear winner** for supply chain optimization: it is the only variational algorithm to achieve AR=1.0000 in under 10 seconds, outperforming standard QAOA (AR=0.60), CVaR-QAOA (AR=0.48), and ADAPT-VQE (AR=0.64). We note that classical ILP solvers currently solve these problem sizes faster (milliseconds vs seconds); this work establishes a quantum-ready benchmarking framework positioned to demonstrate advantage as physical hardware scales. The pipeline includes Zero-Noise Extrapolation recovering up to 65% of noise-induced energy degradation, carbon-aware optimization, and honest benchmarking against provably optimal ILP. All 28 correctness tests pass on the FX700 cluster.
+Among 12 algorithm variants benchmarked, **RQAOA emerges as the clear winner** for supply chain optimization: it is the only variational algorithm to achieve AR=1.0000 in under 10 seconds, outperforming standard QAOA (AR=0.60), CVaR-QAOA (AR=0.48), and ADAPT-VQE (AR=0.64). We note that classical ILP solvers currently solve these problem sizes faster (milliseconds vs seconds); this work establishes a quantum-ready benchmarking framework positioned to demonstrate advantage as physical hardware scales. The pipeline includes Zero-Noise Extrapolation recovering up to 65% of noise-induced energy degradation, carbon-aware optimization, and honest benchmarking against provably optimal ILP. All 28 correctness tests pass on the FX700 cluster.
 
 ---
 
@@ -188,7 +188,7 @@ We independently verified all solutions using **pytket-tenet v0.5.0**, Fujitsu's
 | 12q | 12 | -31.3317 | -31.3317 (3.1s) | -31.3317 (3.5s) | ✅ Exact |
 | 36q | 36 | -22.4559 | _(skipped — >20q)_ | -22.4559 (51.6s) | ✅ Exact |
 
-**Key finding:** Tenet MPS verification at 36 qubits demonstrates Fujitsu's tensor network simulator operating on a real combinatorial optimization problem. The MPS bond dimension of χ=64 provides exact verification for our RQAOA solutions, confirming that supply chain Ising Hamiltonians with QAOA-depth circuits maintain low entanglement suitable for tensor network simulation.
+**Key finding:** Tenet MPS verification at 36 qubits demonstrates Fujitsu's tensor network simulator operating on a real combinatorial optimization problem. Our verification circuits are product states (X gates preparing the solution bitstring), which MPS represents exactly at any bond dimension — the match to machine precision confirms numerical consistency across backends. For full QAOA circuits with entangling gates, higher bond dimensions would be required, but the verification use case is inherently exact.
 
 ### 4.3 Cross-Backend Consistency
 
@@ -264,7 +264,7 @@ All 12 algorithms benchmarked at 6 qubits on FX700 (data/request_advantage.json)
 | CVaR-QAOA | -46.20 | $2,050 | 1.44× | 0.4762 | 375.2s |
 | Pareto QAOA | -35.44 | $800 | 3.69× | 0.3653 | 21.6s |
 
-**★ Thesis: RQAOA is the most viable path forward for supply chain optimization.** Among all 12 variants, RQAOA is the only algorithm that simultaneously achieves: (a) perfect AR=1.0000, (b) fast runtime (9s vs Warm-Start's 56s for the same result), and (c) a principled scaling path via ScalableRQAOA. Warm-Start QAOA matches RQAOA's accuracy but at 6× the runtime. Standard QAOA, CVaR-QAOA, and VQE variants all fail to reach the global optimum on this problem, confirming that recursive variable elimination — not deeper circuits or risk-aware objectives — is the critical algorithmic innovation for constrained combinatorial optimization.
+**★ Thesis: RQAOA is the most viable path forward for supply chain optimization.** Among all 12 variants, RQAOA is the only algorithm that simultaneously achieves: (a) perfect AR=1.0000, (b) genuine quantum simulation (using ⟨Z_iZ_j⟩ correlations from QAOA wavefunctions), and (c) a principled scaling path. ScalableRQAOA also achieves AR=1.0000 in ~0s, but its speed comes from bypassing quantum simulation entirely — it uses classical correlation heuristics at small scales, which defeats the purpose of a quantum simulator challenge. RQAOA's 9-second runtime is the cost of actual quantum correlations guiding variable elimination. Warm-Start QAOA matches RQAOA's accuracy but at 6× the runtime. Standard QAOA, CVaR-QAOA, and VQE variants all fail to reach the global optimum, confirming that recursive quantum-correlation-driven elimination — not deeper circuits or risk-aware objectives — is the critical algorithmic innovation.
 
 ### 5.3 Runtime Reality Check
 
